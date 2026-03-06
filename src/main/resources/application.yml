@@ -1,0 +1,47 @@
+
+spring:
+  config:
+    activate:
+      on-profile: local
+  datasource:
+    url: jdbc:mysql://localhost:3306/pgcore
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+  h2:
+    console:
+      enabled: true
+
+webhook:
+  limiter:
+    type: local       # local | redis
+    cache-name: ${CACHE_NAME}
+    maximum-size: ${LIMITER_MAX}
+    expire-after-access-seconds: ${CACHE_EXPIRE_AFTER}
+  worker:
+    batch-size: ${WORKER_BATCH_SIZE}
+    interval-ms: ${WORKER_INTERVAL_MS}
+    max-attempts: ${WORKER_MAX_ATTEMPTS}
+    concurrency-per-endpoint: ${WORKER_CONCURRENCY_ENDPOINT}
+    send-threads: ${WORKER_SEND_THREAD}
+  lease:
+    minutes: ${LEASE_MINUTES}
+    sweep-interval-ms: ${SWEEP_INTERVAL_MS}
+  http:
+    connect-timeout-ms: ${HTTP_CONN_TIMEOUT}
+    read-timeout-ms: ${HTTP_READ_TIMEOUT}
+  secret:
+    # AES-256-GCM key: base64(32 bytes). ??? WEBHOOK_SECRET_KEY ????? ???? ?. ??? ? ?? ??.
+    encryption-key: ${WEBHOOK_SECRET_KEY}
+    # ?????? ?? ? ??? false? ??. true? ??? ??.
+    allow-plaintext-fallback: ${WEBHOOK_ALLOW_PLAINTEXT}
+  endpoint:
+    # ????? ??? true. HTTP ??? ??? ??(?? ???)?? false? ??.
+    require-https: ${WEBHOOK_REQUIRE_HTTPS}
+
+server:
+  port: 8081
