@@ -22,4 +22,15 @@ class WebhookEndpointReadRepositoryImpl(
             )
             .fetch()
     }
+
+    override fun findActiveEndpointIdsByMerchantId(merchantId: Long): List<Long> {
+        return queryFactory
+            .select(qEndpoint.endpointId)
+            .from(qEndpoint)
+            .where(
+                qEndpoint.merchantId.eq(merchantId),
+                qEndpoint.isActive.eq(true),
+            )
+            .fetch()
+    }
 }

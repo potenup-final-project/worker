@@ -10,6 +10,8 @@ import jakarta.persistence.Id
 import jakarta.persistence.Index
 import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
+import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.type.SqlTypes
 import java.time.LocalDateTime
 import java.util.UUID
 
@@ -28,7 +30,7 @@ class WebhookDelivery protected constructor(
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     val deliveryId: Long = 0,
 
-    @Column(nullable = false, updatable = false)
+    @Column(length = 36, nullable = false, updatable = false)
     val eventId: UUID,
 
     @Column(nullable = false, updatable = false)
