@@ -7,6 +7,8 @@ import com.pg.worker.webhook.application.usecase.dto.ClaimedDelivery
 import com.pg.worker.webhook.application.usecase.repository.WebhookDeliveryStateRepository
 import com.pg.worker.webhook.application.usecase.repository.WebhookEndpointReadRepository
 import com.pg.worker.webhook.application.usecase.repository.WebhookSendClient
+import com.pg.worker.webhook.application.usecase.repository.dto.DeliverySendOutcome
+import com.pg.worker.webhook.domain.WebhookDeliveryStatus
 import com.pg.worker.webhook.domain.WebhookEndpoint
 import com.pg.worker.webhook.util.BackoffCalculator
 import com.pg.worker.webhook.util.RetryClassifier
@@ -37,6 +39,7 @@ class SendWebhookService(
 ) : SendWebhookDeliveriesUseCase {
     private val log = LoggerFactory.getLogger(javaClass)
     private val sendExecutor = Executors.newFixedThreadPool(sendThreads)
+
     companion object {
         private const val ERROR_ENDPOINT_REMOVED = "ENDPOINT_NOT_FOUND:endpoint removed"
         private const val ERROR_INTERNAL_PREFIX = "INTERNAL:"
@@ -49,8 +52,22 @@ class SendWebhookService(
 
         val endpointMap = preloadEndpoints(claimed)
 
-        val futures = claimed.map { delivery -> CompletableFuture.runAsync({ processSingle(delivery, endpointMap) }, sendExecutor) }
+        val futures = claimed.map { delivery ->
+            CompletableFuture.supplyAsync({ processSingle(delivery, endpointMap) }, sendExecutor)
+        }
         CompletableFuture.allOf(*futures.toTypedArray()).join()
+
+        val outcomes = futures.mapNotNull { it.join() }
+        deliveryStateRepository.applySendOutcomesNewTransaction(outcomes)
+
+        outcomes.forEach { outcome ->
+            when (outcome.status) {
+                WebhookDeliveryStatus.SUCCESS -> metrics.recordDeliverySuccess()
+                WebhookDeliveryStatus.FAILED -> metrics.recordDeliveryRetry()
+                WebhookDeliveryStatus.DEAD -> metrics.recordDeliveryDead()
+                else -> Unit
+            }
+        }
     }
 
     @PreDestroy
@@ -58,7 +75,10 @@ class SendWebhookService(
         sendExecutor.shutdown()
     }
 
-    private fun processSingle(delivery: ClaimedDelivery, endpointMap: Map<EndpointKey, WebhookEndpoint>) {
+    private fun processSingle(
+        delivery: ClaimedDelivery,
+        endpointMap: Map<EndpointKey, WebhookEndpoint>,
+    ): DeliverySendOutcome? {
         if (!concurrencyLimiter.tryAcquire(delivery.endpointId)) {
             deliveryStateRepository.revertClaim(delivery.deliveryId)
             log.debug(
@@ -66,21 +86,22 @@ class SendWebhookService(
                 delivery.deliveryId,
                 delivery.endpointId,
             )
-            return
+            return null
         }
+
         try {
             val endpoint = endpointMap[EndpointKey(delivery.merchantId, delivery.endpointId)]
                 ?: return deadBecauseEndpointMissing(delivery)
-            sendAndRecord(delivery, endpoint)
+            return sendAndClassify(delivery, endpoint)
         } finally {
             concurrencyLimiter.release(delivery.endpointId)
         }
     }
 
-    private fun sendAndRecord(delivery: ClaimedDelivery, endpoint: WebhookEndpoint) {
+    private fun sendAndClassify(delivery: ClaimedDelivery, endpoint: WebhookEndpoint): DeliverySendOutcome {
         val startMs = System.currentTimeMillis()
 
-        try {
+        return try {
             val result = sendClient.send(
                 url = endpoint.url,
                 secret = decryptSecret(endpoint.secret),
@@ -88,16 +109,10 @@ class SendWebhookService(
                 payloadSnapshot = delivery.payloadSnapshot,
             )
             val responseMs = System.currentTimeMillis() - startMs
-
             when (RetryClassifier.classifyHttpStatus(result.httpStatus)) {
-                RetryClassifier.Outcome.SUCCESS ->
-                    success(delivery, result.httpStatus, responseMs)
-
-                RetryClassifier.Outcome.RETRY ->
-                    retry(delivery, result.httpStatus, RetryClassifier.toErrorCode(result.httpStatus))
-
-                RetryClassifier.Outcome.DEAD ->
-                    dead(delivery, result.httpStatus, RetryClassifier.toErrorCode(result.httpStatus))
+                RetryClassifier.Outcome.SUCCESS -> success(delivery, result.httpStatus, responseMs)
+                RetryClassifier.Outcome.RETRY -> retry(delivery, result.httpStatus, RetryClassifier.toErrorCode(result.httpStatus))
+                RetryClassifier.Outcome.DEAD -> dead(delivery, result.httpStatus, RetryClassifier.toErrorCode(result.httpStatus))
             }
         } catch (e: IOException) {
             retry(delivery, httpStatus = null, errorCode = RetryClassifier.toNetworkErrorCode(e))
@@ -108,25 +123,33 @@ class SendWebhookService(
         }
     }
 
-    private fun success(delivery: ClaimedDelivery, httpStatus: Int, responseMs: Long) {
-        deliveryStateRepository.markSuccessNewTransaction(delivery.deliveryId, httpStatus, responseMs)
-        metrics.recordDeliverySuccess()
+    private fun success(delivery: ClaimedDelivery, httpStatus: Int, responseMs: Long): DeliverySendOutcome {
         log.debug(
             "[SendWebhookService] deliveryId={} SUCCESS status={} ms={}",
             delivery.deliveryId,
             httpStatus,
             responseMs,
         )
+        return DeliverySendOutcome(
+            deliveryId = delivery.deliveryId,
+            status = WebhookDeliveryStatus.SUCCESS,
+            httpStatus = httpStatus,
+            responseMs = responseMs,
+        )
     }
 
-    private fun retry(delivery: ClaimedDelivery, httpStatus: Int?, errorCode: String) {
-        handleRetry(delivery, httpStatus, errorCode)
+    private fun retry(delivery: ClaimedDelivery, httpStatus: Int?, errorCode: String): DeliverySendOutcome {
+        return handleRetry(delivery, httpStatus, errorCode)
     }
 
-    private fun dead(delivery: ClaimedDelivery, httpStatus: Int?, errorCode: String) {
-        deliveryStateRepository.markDeadNewTransaction(delivery.deliveryId, httpStatus, errorCode)
-        metrics.recordDeliveryDead()
+    private fun dead(delivery: ClaimedDelivery, httpStatus: Int?, errorCode: String): DeliverySendOutcome {
         log.warn("[SendWebhookService] deliveryId={} DEAD status={}", delivery.deliveryId, httpStatus)
+        return DeliverySendOutcome(
+            deliveryId = delivery.deliveryId,
+            status = WebhookDeliveryStatus.DEAD,
+            httpStatus = httpStatus,
+            errorCode = errorCode,
+        )
     }
 
     private fun decryptSecret(encryptedSecret: String): String {
@@ -142,27 +165,36 @@ class SendWebhookService(
         }
     }
 
-    private fun handleRetry(delivery: ClaimedDelivery, httpStatus: Int?, errorCode: String) {
+    private fun handleRetry(delivery: ClaimedDelivery, httpStatus: Int?, errorCode: String): DeliverySendOutcome {
         if (delivery.attemptNo >= maxAttempts) {
-            deliveryStateRepository.markDeadNewTransaction(delivery.deliveryId, httpStatus, "$errorCode:$ERROR_MAX_ATTEMPTS_EXCEEDED")
-            metrics.recordDeliveryDead()
             log.warn(
                 "[SendWebhookService] deliveryId={} DEAD (attempt={} >= max={})",
                 delivery.deliveryId,
                 delivery.attemptNo,
                 maxAttempts,
             )
-        } else {
-            val nextAt = BackoffCalculator.nextAttemptAt(delivery.attemptNo)
-            deliveryStateRepository.markFailedNewTransaction(delivery.deliveryId, httpStatus, errorCode, nextAt)
-            metrics.recordDeliveryRetry()
-            log.debug(
-                "[SendWebhookService] deliveryId={} FAILED attempt={} nextAt={}",
-                delivery.deliveryId,
-                delivery.attemptNo,
-                nextAt,
+            return DeliverySendOutcome(
+                deliveryId = delivery.deliveryId,
+                status = WebhookDeliveryStatus.DEAD,
+                httpStatus = httpStatus,
+                errorCode = "$errorCode:$ERROR_MAX_ATTEMPTS_EXCEEDED",
             )
         }
+
+        val nextAt = BackoffCalculator.nextAttemptAt(delivery.attemptNo)
+        log.debug(
+            "[SendWebhookService] deliveryId={} FAILED attempt={} nextAt={}",
+            delivery.deliveryId,
+            delivery.attemptNo,
+            nextAt,
+        )
+        return DeliverySendOutcome(
+            deliveryId = delivery.deliveryId,
+            status = WebhookDeliveryStatus.FAILED,
+            httpStatus = httpStatus,
+            errorCode = errorCode,
+            nextAttemptAt = nextAt,
+        )
     }
 
     private fun preloadEndpoints(claimed: List<ClaimedDelivery>): Map<EndpointKey, WebhookEndpoint> {
@@ -170,15 +202,16 @@ class SendWebhookService(
             .flatMap { (merchantId, deliveries) ->
                 val endpointIds = deliveries.map { it.endpointId }.toSet()
                 endpointRepository.findByMerchantIdAndEndpointIds(merchantId, endpointIds)
-            }.associateBy { EndpointKey(it.merchantId, it.endpointId) }
+            }
+            .associateBy { EndpointKey(it.merchantId, it.endpointId) }
     }
 
-    private fun deadBecauseEndpointMissing(delivery: ClaimedDelivery) {
+    private fun deadBecauseEndpointMissing(delivery: ClaimedDelivery): DeliverySendOutcome {
         log.warn(
-            "[WebhookDeliveryService] deliveryId={} endpointId={} not found → DEAD",
+            "[SendWebhookService] deliveryId={} endpointId={} not found -> DEAD",
             delivery.deliveryId,
             delivery.endpointId,
         )
-        dead(delivery, httpStatus = null, errorCode = ERROR_ENDPOINT_REMOVED)
+        return dead(delivery, httpStatus = null, errorCode = ERROR_ENDPOINT_REMOVED)
     }
 }

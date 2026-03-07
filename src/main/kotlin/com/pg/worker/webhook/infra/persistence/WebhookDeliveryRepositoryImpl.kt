@@ -2,15 +2,18 @@ package com.pg.worker.webhook.infra.persistence
 
 import com.pg.worker.webhook.application.usecase.dto.ClaimedDelivery
 import com.pg.worker.webhook.application.usecase.repository.WebhookDeliveryStateRepository
+import com.pg.worker.webhook.application.usecase.repository.dto.DeliverySendOutcome
 import com.pg.worker.webhook.domain.QWebhookDelivery
 import com.pg.worker.webhook.domain.WebhookDeliveryStatus
 import com.querydsl.jpa.impl.JPAQueryFactory
 import jakarta.persistence.EntityManager
 import jakarta.persistence.LockModeType
 import org.slf4j.LoggerFactory
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
+import java.sql.Timestamp
 import java.time.LocalDateTime
 import java.util.UUID
 
@@ -19,6 +22,7 @@ import java.util.UUID
 class WebhookDeliveryRepositoryImpl(
     private val queryFactory: JPAQueryFactory,
     private val entityManager: EntityManager,
+    private val jdbcTemplate: JdbcTemplate,
 ) : WebhookDeliveryStateRepository {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -87,7 +91,7 @@ class WebhookDeliveryRepositoryImpl(
                 VALUES $valuesSql
                 """.trimIndent()
             )
-                .setParameter("eventId", eventId)
+                .setParameter("eventId", eventId.toString())
                 .setParameter("merchantId", merchantId)
                 .setParameter("payload", payloadSnapshot)
 
@@ -139,6 +143,74 @@ class WebhookDeliveryRepositoryImpl(
         else clause.setNull(qDelivery.lastHttpStatus)
 
         clause.where(qDelivery.deliveryId.eq(deliveryId)).execute()
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    override fun applySendOutcomesNewTransaction(outcomes: List<DeliverySendOutcome>) {
+        if (outcomes.isEmpty()) return
+
+        val successes = outcomes.filter { it.status == WebhookDeliveryStatus.SUCCESS }
+        if (successes.isNotEmpty()) {
+            jdbcTemplate.batchUpdate(
+                """
+                UPDATE webhook_deliveries
+                   SET status = 'SUCCESS',
+                       last_http_status = ?,
+                       last_response_ms = ?,
+                       last_error = NULL,
+                       updated_at = NOW(3)
+                 WHERE delivery_id = ?
+                """.trimIndent(),
+                successes,
+                successes.size,
+            ) { ps, row ->
+                ps.setInt(1, requireNotNull(row.httpStatus))
+                ps.setLong(2, requireNotNull(row.responseMs))
+                ps.setLong(3, row.deliveryId)
+            }
+        }
+
+        val failed = outcomes.filter { it.status == WebhookDeliveryStatus.FAILED }
+        if (failed.isNotEmpty()) {
+            jdbcTemplate.batchUpdate(
+                """
+                UPDATE webhook_deliveries
+                   SET status = 'FAILED',
+                       last_http_status = ?,
+                       last_error = ?,
+                       next_attempt_at = ?,
+                       updated_at = NOW(3)
+                 WHERE delivery_id = ?
+                """.trimIndent(),
+                failed,
+                failed.size,
+            ) { ps, row ->
+                if (row.httpStatus != null) ps.setInt(1, row.httpStatus) else ps.setNull(1, java.sql.Types.INTEGER)
+                ps.setString(2, requireNotNull(row.errorCode))
+                ps.setTimestamp(3, Timestamp.valueOf(requireNotNull(row.nextAttemptAt)))
+                ps.setLong(4, row.deliveryId)
+            }
+        }
+
+        val dead = outcomes.filter { it.status == WebhookDeliveryStatus.DEAD }
+        if (dead.isNotEmpty()) {
+            jdbcTemplate.batchUpdate(
+                """
+                UPDATE webhook_deliveries
+                   SET status = 'DEAD',
+                       last_http_status = ?,
+                       last_error = ?,
+                       updated_at = NOW(3)
+                 WHERE delivery_id = ?
+                """.trimIndent(),
+                dead,
+                dead.size,
+            ) { ps, row ->
+                if (row.httpStatus != null) ps.setInt(1, row.httpStatus) else ps.setNull(1, java.sql.Types.INTEGER)
+                ps.setString(2, requireNotNull(row.errorCode))
+                ps.setLong(3, row.deliveryId)
+            }
+        }
     }
 
     // REQUIRES_NEW: claimDueBatch에서 증가된 attempt_no를 원복하고 FAILED로 되돌림 (HTTP 미시도 claim 취소)
