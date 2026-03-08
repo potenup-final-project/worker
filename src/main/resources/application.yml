@@ -1,4 +1,3 @@
-
 spring:
   config:
     activate:
@@ -16,9 +15,19 @@ spring:
     console:
       enabled: true
 
+  cloud:
+    aws:
+      region:
+        static: ap-northeast-2
+      credentials:
+        access-key: test
+        secret-key: test
+      sqs:
+        endpoint: http://localhost:9324
+
 webhook:
   limiter:
-    type: local       # local | redis
+    type: local
     cache-name: ${CACHE_NAME}
     maximum-size: ${LIMITER_MAX}
     expire-after-access-seconds: ${CACHE_EXPIRE_AFTER}
@@ -35,12 +44,9 @@ webhook:
     connect-timeout-ms: ${HTTP_CONN_TIMEOUT}
     read-timeout-ms: ${HTTP_READ_TIMEOUT}
   secret:
-    # AES-256-GCM key: base64(32 bytes). ??? WEBHOOK_SECRET_KEY ????? ???? ?. ??? ? ?? ??.
     encryption-key: ${WEBHOOK_SECRET_KEY}
-    # ?????? ?? ? ??? false? ??. true? ??? ??.
     allow-plaintext-fallback: ${WEBHOOK_ALLOW_PLAINTEXT}
   endpoint:
-    # ????? ??? true. HTTP ??? ??? ??(?? ???)?? false? ??.
     require-https: ${WEBHOOK_REQUIRE_HTTPS}
 
 server:
