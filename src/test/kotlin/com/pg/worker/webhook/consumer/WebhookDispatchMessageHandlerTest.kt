@@ -1,7 +1,6 @@
 package com.pg.worker.webhook.consumer
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import com.pg.worker.webhook.application.usecase.command.SendWebhookDeliveriesUseCase
 import com.pg.worker.webhook.application.usecase.repository.WebhookDeliveryStateRepository
 import com.pg.worker.webhook.application.usecase.repository.WebhookEndpointReadRepository
 import com.pg.worker.webhook.consumer.dto.WebhookDispatchMessage
@@ -19,18 +18,15 @@ class WebhookDispatchMessageHandlerTest {
     private val objectMapper = jacksonObjectMapper()
     private val deliveryRepository = mockk<WebhookDeliveryStateRepository>(relaxed = true)
     private val endpointRepository = mockk<WebhookEndpointReadRepository>()
-    private val sendUseCase = mockk<SendWebhookDeliveriesUseCase>(relaxed = true)
 
     private val handler = WebhookDispatchMessageHandler(
         objectMapper = objectMapper,
         deliveryRepository = deliveryRepository,
         endpointRepository = endpointRepository,
-        sendWebhookDeliveriesUseCase = sendUseCase,
-        batchSize = 10,
     )
 
     @Test
-    fun `유효한 메시지를 처리하면 endpoint 기반으로 delivery를 생성하고 배치를 전송한다`() {
+    fun `유효한 메시지를 처리하면 endpoint 기반으로 delivery를 생성한다`() {
         val message = WebhookDispatchMessage(
             eventId = UUID.randomUUID(),
             merchantId = 9L,
@@ -40,7 +36,6 @@ class WebhookDispatchMessageHandlerTest {
 
         every { endpointRepository.findActiveEndpointIdsByMerchantId(9L) } returns listOf(11L, 12L)
         every { deliveryRepository.bulkInsertIgnore(any(), any(), any(), any()) } just runs
-        every { sendUseCase.sendBatch(10) } just runs
 
         val result = handler.handle(json)
 
@@ -53,7 +48,6 @@ class WebhookDispatchMessageHandlerTest {
                 payloadSnapshot = "{\"k\":\"v\"}",
             )
         }
-        verify(exactly = 1) { sendUseCase.sendBatch(10) }
     }
 
     @Test
@@ -63,6 +57,5 @@ class WebhookDispatchMessageHandlerTest {
         assertTrue(result)
         verify(exactly = 0) { endpointRepository.findActiveEndpointIdsByMerchantId(any()) }
         verify(exactly = 0) { deliveryRepository.bulkInsertIgnore(any(), any(), any(), any()) }
-        verify(exactly = 0) { sendUseCase.sendBatch(any()) }
     }
 }

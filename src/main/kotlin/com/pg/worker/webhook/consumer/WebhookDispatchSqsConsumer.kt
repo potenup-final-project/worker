@@ -13,9 +13,9 @@ class WebhookDispatchSqsConsumer(
     private val sqsClient: SqsClient,
     private val handler: WebhookDispatchMessageHandler,
     @Value("\${webhook.sqs.queue-url}") private val queueUrl: String,
-    @Value("\${webhook.sqs.max-messages:10}") private val maxMessages: Int,
-    @Value("\${webhook.sqs.wait-time-seconds:20}") private val waitTimeSeconds: Int,
-    @Value("\${webhook.sqs.visibility-timeout-seconds:30}") private val visibilityTimeoutSeconds: Int,
+    @Value("\${webhook.sqs.max-messages}") private val maxMessages: Int,
+    @Value("\${webhook.sqs.wait-time-seconds}") private val waitTimeSeconds: Int,
+    @Value("\${webhook.sqs.visibility-timeout-seconds}") private val visibilityTimeoutSeconds: Int,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -23,7 +23,7 @@ class WebhookDispatchSqsConsumer(
         require(queueUrl.isNotBlank()) { "webhook.sqs.queue-url must be configured when webhook.sqs.enabled=true" }
     }
 
-    @Scheduled(fixedDelayString = "\${webhook.sqs.poll-interval-ms:1000}")
+    @Scheduled(fixedDelayString = "\${webhook.sqs.poll-interval-ms}")
     fun poll() {
         val messages = sqsClient.receiveMessage { req ->
             req.queueUrl(queueUrl)

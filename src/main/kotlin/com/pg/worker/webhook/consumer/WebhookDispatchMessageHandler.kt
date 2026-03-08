@@ -1,12 +1,10 @@
 package com.pg.worker.webhook.consumer
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.pg.worker.webhook.application.usecase.command.SendWebhookDeliveriesUseCase
 import com.pg.worker.webhook.application.usecase.repository.WebhookDeliveryStateRepository
 import com.pg.worker.webhook.application.usecase.repository.WebhookEndpointReadRepository
 import com.pg.worker.webhook.consumer.dto.WebhookDispatchMessage
 import org.slf4j.LoggerFactory
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
 
 @Component
@@ -14,8 +12,6 @@ class WebhookDispatchMessageHandler(
     private val objectMapper: ObjectMapper,
     private val deliveryRepository: WebhookDeliveryStateRepository,
     private val endpointRepository: WebhookEndpointReadRepository,
-    private val sendWebhookDeliveriesUseCase: SendWebhookDeliveriesUseCase,
-    @Value("\${webhook.worker.batch-size}") private val batchSize: Int,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -36,8 +32,6 @@ class WebhookDispatchMessageHandler(
                 payloadSnapshot = message.payload,
             )
         }
-
-        sendWebhookDeliveriesUseCase.sendBatch(batchSize)
         return true
     }
 }

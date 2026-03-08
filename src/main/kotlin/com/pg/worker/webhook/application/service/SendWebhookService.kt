@@ -19,6 +19,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import java.io.IOException
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Executors
 
@@ -73,6 +74,9 @@ class SendWebhookService(
     @PreDestroy
     fun shutdown() {
         sendExecutor.shutdown()
+        if (!sendExecutor.awaitTermination(30, TimeUnit.SECONDS)) {
+            sendExecutor.shutdownNow()
+        }
     }
 
     private fun processSingle(
