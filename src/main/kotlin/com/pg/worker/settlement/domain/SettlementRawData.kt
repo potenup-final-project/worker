@@ -17,6 +17,7 @@ import java.time.LocalDateTime
     indexes = [
         Index(name = "idx_raw_event_id", columnList = "event_id", unique = true),
         Index(name = "idx_raw_status_retry", columnList = "status, next_retry_at"),
+        Index(name = "idx_raw_status_claimed", columnList = "status, claimed_at"),
         Index(name = "idx_raw_payment_key", columnList = "payment_key")
     ]
 )
@@ -74,6 +75,9 @@ class SettlementRawData protected constructor(
     @Column(name = "last_tried_at")
     var lastTriedAt: LocalDateTime? = null,
 
+    @Column(name = "claimed_at")
+    var claimedAt: LocalDateTime? = null,
+
     @Column(name = "failure_reason", length = 500)
     var failureReason: String? = null,
 
@@ -100,11 +104,17 @@ class SettlementRawData protected constructor(
         }
     }
 
+    fun claim() {
+        this.status = RawDataStatus.PROCESSING
+        this.claimedAt = LocalDateTime.now()
+    }
+
     fun markProcessed() {
         this.status = RawDataStatus.PROCESSED
         this.lastTriedAt = LocalDateTime.now()
         this.failureReason = null
         this.nextRetryAt = null
+        this.claimedAt = null
     }
 
     fun markPendingDependency(reason: String, nextRetryAt: LocalDateTime) {
@@ -112,6 +122,7 @@ class SettlementRawData protected constructor(
         this.failureReason = reason
         this.nextRetryAt = nextRetryAt
         this.lastTriedAt = LocalDateTime.now()
+        this.claimedAt = null
     }
 
     fun markFailedRetryable(reason: String, nextRetryAt: LocalDateTime) {
@@ -120,6 +131,7 @@ class SettlementRawData protected constructor(
         this.retryCount++
         this.nextRetryAt = nextRetryAt
         this.lastTriedAt = LocalDateTime.now()
+        this.claimedAt = null
     }
 
     fun markFailedNonRetryable(reason: String) {
@@ -127,5 +139,6 @@ class SettlementRawData protected constructor(
         this.failureReason = reason
         this.lastTriedAt = LocalDateTime.now()
         this.nextRetryAt = null
+        this.claimedAt = null
     }
 }
