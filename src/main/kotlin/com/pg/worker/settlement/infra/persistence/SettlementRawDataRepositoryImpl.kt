@@ -34,6 +34,10 @@ class SettlementRawDataRepositoryImpl(
         return jpaRepository.findById(id).orElse(null)
     }
 
+    override fun findByTransactionId(transactionId: Long): SettlementRawData? {
+        return jpaRepository.findByTransactionId(transactionId)
+    }
+
     override fun findRetryableDataForClaim(
         statuses: List<RawDataStatus>,
         now: LocalDateTime,

@@ -17,7 +17,6 @@ class SettlementStatusUpdater(
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     fun updateToPending(rawId: Long, reason: String) {
         rawRepository.findById(rawId)?.apply {
-            this.retryCount++
             if (this.retryCount >= SettlementRetryPolicy.MAX_RETRY_COUNT) {
                 log.error("[Settlement] [PENDING_EXHAUSTED] 의존성 대기 임계치 초과. 영구 실패 처리. rawId={}, retryCount={}", 
                     rawId, this.retryCount)

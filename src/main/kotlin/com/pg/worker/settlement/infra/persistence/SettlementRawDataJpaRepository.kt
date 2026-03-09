@@ -7,4 +7,5 @@ import org.springframework.data.jpa.repository.JpaRepository
 interface SettlementRawDataJpaRepository : JpaRepository<SettlementRawData, Long> {
     fun existsByEventId(eventId: String): Boolean
     fun findByPaymentKeyAndTransactionType(paymentKey: String, type: TransactionType): SettlementRawData?
+    fun findByTransactionId(transactionId: Long): SettlementRawData?
 }

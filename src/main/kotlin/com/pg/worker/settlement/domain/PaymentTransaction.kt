@@ -9,7 +9,8 @@ import java.time.LocalDateTime
 @Table(name = "payment_transactions")
 class PaymentTransaction(
     @Id
-    @Column(name = "tx_id")
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "tx_id", nullable = false, updatable = false)
     val id: Long,
 
     @Column(name = "payment_id", nullable = false, updatable = false)

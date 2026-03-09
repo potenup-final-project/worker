@@ -125,6 +125,7 @@ class SettlementRawData protected constructor(
     fun markPendingDependency(reason: String, nextRetryAt: LocalDateTime) {
         this.status = RawDataStatus.PENDING_DEPENDENCY
         this.failureReason = reason
+        this.retryCount++
         this.nextRetryAt = nextRetryAt
         this.lastTriedAt = LocalDateTime.now()
         this.claimedAt = null
