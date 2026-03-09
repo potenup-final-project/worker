@@ -17,6 +17,7 @@ import java.util.UUID
 // HMAC-SHA256 서명 포함 웹훅 HTTP POST 전송 클라이언트 (secret은 절대 로그 출력 금지)
 @Component
 class WebhookHttpClient(
+    private val outboundUrlValidator: WebhookOutboundUrlValidator,
     @Value("\${webhook.http.connect-timeout-ms}") private val connectTimeoutMs: Long,
     @Value("\${webhook.http.read-timeout-ms}") private val readTimeoutMs: Long,
 ) : WebhookSendClient {
@@ -46,7 +47,9 @@ class WebhookHttpClient(
 
         log.debug("[WebhookSend] eventId={} url={} timestamp={}", eventId, url, timestamp)
 
-        val request = HttpRequest.newBuilder(URI.create(url))
+        val targetUri = outboundUrlValidator.validate(url)
+
+        val request = HttpRequest.newBuilder(targetUri)
             .POST(HttpRequest.BodyPublishers.ofByteArray(rawBody))
             .header(HEADER_CONTENT_TYPE, CONTENT_TYPE_JSON)
             .header(HEADER_TIMESTAMP, timestamp.toString())
