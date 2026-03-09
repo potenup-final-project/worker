@@ -1,5 +1,7 @@
-
 spring:
+  config:
+    activate:
+      on-profile: local
   datasource:
     url: jdbc:mysql://localhost:3306/pgcore
     username: ${DB_USER}
@@ -7,7 +9,7 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     hibernate:
-      ddl-auto: create
+      ddl-auto: update
     show-sql: true
   h2:
     console:
@@ -17,6 +19,16 @@ spring:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
+
+  cloud:
+    aws:
+      region:
+        static: ap-northeast-2
+      credentials:
+        access-key: test
+        secret-key: test
+      sqs:
+        endpoint: http://localhost:9324
 
 webhook:
   sqs:
@@ -45,12 +57,9 @@ webhook:
     connect-timeout-ms: ${HTTP_CONN_TIMEOUT}
     read-timeout-ms: ${HTTP_READ_TIMEOUT}
   secret:
-    # AES-256-GCM key: base64(32 bytes). ??? WEBHOOK_SECRET_KEY ????? ???? ?. ??? ? ?? ??.
     encryption-key: ${WEBHOOK_SECRET_KEY}
-    # ?????? ?? ? ??? false? ??. true? ??? ??.
     allow-plaintext-fallback: ${WEBHOOK_ALLOW_PLAINTEXT}
   endpoint:
-    # ????? ??? true. HTTP ??? ??? ??(?? ???)?? false? ??.
     require-https: ${WEBHOOK_REQUIRE_HTTPS}
 
 server:
