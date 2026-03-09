@@ -28,6 +28,9 @@ class WebhookDispatchMessageHandlerTest {
     @Test
     fun `유효한 메시지를 처리하면 endpoint 기반으로 delivery를 생성한다`() {
         val message = WebhookDispatchMessage(
+            messageId = "msg-1",
+            occurredAt = "2026-03-08T00:00:00",
+            eventType = "CHECKOUT_CONFIRMED",
             eventId = UUID.randomUUID(),
             merchantId = 9L,
             payload = "{\"k\":\"v\"}",
@@ -35,7 +38,7 @@ class WebhookDispatchMessageHandlerTest {
         val json = objectMapper.writeValueAsString(message)
 
         every { endpointRepository.findActiveEndpointIdsByMerchantId(9L) } returns listOf(11L, 12L)
-        every { deliveryRepository.bulkInsertIgnore(any(), any(), any(), any()) } just runs
+        every { deliveryRepository.bulkInsertIgnore(any(), any(), any(), any(), any(), any(), any()) } just runs
 
         val result = handler.handle(json)
 
@@ -43,6 +46,9 @@ class WebhookDispatchMessageHandlerTest {
         verify(exactly = 1) {
             deliveryRepository.bulkInsertIgnore(
                 eventId = message.eventId,
+                messageId = "msg-1",
+                traceId = null,
+                eventType = "CHECKOUT_CONFIRMED",
                 merchantId = 9L,
                 endpointIds = listOf(11L, 12L),
                 payloadSnapshot = "{\"k\":\"v\"}",
@@ -56,6 +62,42 @@ class WebhookDispatchMessageHandlerTest {
 
         assertTrue(result)
         verify(exactly = 0) { endpointRepository.findActiveEndpointIdsByMerchantId(any()) }
-        verify(exactly = 0) { deliveryRepository.bulkInsertIgnore(any(), any(), any(), any()) }
+        verify(exactly = 0) { deliveryRepository.bulkInsertIgnore(any(), any(), any(), any(), any(), any(), any()) }
     }
+
+    @Test
+    fun `지원하지 않는 schemaVersion 메시지는 건너뛴다`() {
+        val message = WebhookDispatchMessage(
+            schemaVersion = 2,
+            eventId = UUID.randomUUID(),
+            merchantId = 9L,
+            payload = "{}",
+        )
+        val json = objectMapper.writeValueAsString(message)
+
+        val result = handler.handle(json)
+
+        assertTrue(result)
+        verify(exactly = 0) { endpointRepository.findActiveEndpointIdsByMerchantId(any()) }
+        verify(exactly = 0) { deliveryRepository.bulkInsertIgnore(any(), any(), any(), any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `schemaVersion 1에서 필수 필드가 누락되면 건너뛴다`() {
+        val message = WebhookDispatchMessage(
+            messageId = null,
+            occurredAt = null,
+            eventType = null,
+            eventId = UUID.randomUUID(),
+            merchantId = 9L,
+            payload = "{}",
+        )
+        val json = objectMapper.writeValueAsString(message)
+
+        val result = handler.handle(json)
+
+        assertTrue(result)
+        verify(exactly = 0) { endpointRepository.findActiveEndpointIdsByMerchantId(any()) }
+        verify(exactly = 0) { deliveryRepository.bulkInsertIgnore(any(), any(), any(), any(), any(), any(), any()) }
+}
 }
