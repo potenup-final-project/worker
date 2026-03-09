@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.dao.ConcurrencyFailureException
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.dao.TransientDataAccessException
+import org.springframework.orm.ObjectOptimisticLockingFailureException
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
@@ -58,6 +59,9 @@ class SettlementLedgerProcessor(
             }
         } catch (e: DataIntegrityViolationException) {
             handleDataIntegrityViolation(raw, e)
+        } catch (e: ObjectOptimisticLockingFailureException) {
+            // 낙관적 락 충돌: SQS 재전송 + 재시도 스케줄러 동시 실행 시 발생 가능 → 재시도로 해결 가능
+            throw RetryableException("낙관적 락 충돌 (동시 수정 감지). eventId: ${raw.eventId}", e)
         } catch (e: ConcurrencyFailureException) {
             throw RetryableException("동시성 충돌(Deadlock 등)로 인한 재시도 가능. eventId: ${raw.eventId}", e)
         } catch (e: TransientDataAccessException) {
@@ -113,7 +117,7 @@ class SettlementLedgerProcessor(
             raw.paymentKey, TransactionType.APPROVE
         ) ?: throw PendingDependencyException("원본 승인 건 미도착 (의존성 대기). key: ${raw.paymentKey}")
 
-        val originalLedger = ledgerRepository.findByRawEventId(originalApproveRaw.eventId)
+        ledgerRepository.findByRawEventId(originalApproveRaw.eventId)
             ?: throw PendingDependencyException("원본 Ledger 미생성 (의존성 대기). event: ${originalApproveRaw.eventId}")
 
         val policy = policyRepository.findByMerchantId(raw.merchantId)
@@ -122,12 +126,14 @@ class SettlementLedgerProcessor(
         val fee = (raw.amount.toBigDecimal() * policy.feeRate)
             .setScale(0, RoundingMode.HALF_UP).toLong()
 
+        val settlementBaseDate = raw.eventOccurredAt.plusDays(policy.settlementCycleDays.toLong())
+
         val ledger = SettlementLedger.create(
             raw = raw,
             originalPaymentTxId = originalApproveRaw.transactionId,
             fee = -fee,
             settlementAmount = -(raw.amount - fee),
-            settlementBaseDate = originalLedger.settlementBaseDate,
+            settlementBaseDate = settlementBaseDate,
             policy = policy
         )
         ledgerRepository.save(ledger)
