@@ -23,6 +23,11 @@ interface SettlementLedgerRepository {
     fun findUnaggregatedLedgers(merchantId: Long, baseDate: LocalDate): List<SettlementLedger>
 
     /**
+     * 특정 내부 거래 ID에 대응하는 가장 최근 정산 원장 단건 조회
+     */
+    fun findLatestByTransactionId(transactionId: Long): SettlementLedger?
+
+    /**
      * 특정 내부 거래 ID에 대응하는 모든 정산 원장 조회
      */
     fun findAllByTransactionId(transactionId: Long): List<SettlementLedger>

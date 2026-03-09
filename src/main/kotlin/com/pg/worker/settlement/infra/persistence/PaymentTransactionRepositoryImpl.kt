@@ -30,6 +30,10 @@ class PaymentTransactionRepositoryImpl(
             .fetch()
     }
 
+    override fun findById(id: Long): PaymentTransaction? {
+        return jpaRepository.findById(id).orElse(null)
+    }
+
     override fun findAllByIdIn(ids: List<Long>): List<PaymentTransaction> {
         return jpaRepository.findAllById(ids)
     }

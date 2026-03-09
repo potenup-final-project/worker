@@ -10,6 +10,7 @@ interface SettlementRawDataRepository {
     fun existsByEventId(eventId: String): Boolean
     fun findByPaymentKeyAndTransactionType(paymentKey: String, type: TransactionType): SettlementRawData?
     fun findById(id: Long): SettlementRawData?
+    fun findByTransactionId(transactionId: Long): SettlementRawData?
     fun findRetryableDataForClaim(statuses: List<RawDataStatus>, now: LocalDateTime, limit: Int): List<SettlementRawData>
     fun findStuckProcessingDataForClaim(threshold: LocalDateTime, limit: Int): List<SettlementRawData>
 }

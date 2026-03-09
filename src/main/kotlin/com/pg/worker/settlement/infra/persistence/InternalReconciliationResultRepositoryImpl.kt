@@ -39,4 +39,8 @@ class InternalReconciliationResultRepositoryImpl(
     ): List<InternalReconciliationResult> {
         return jpaRepository.findAllByStatusAndMismatchTypeInAndReconciliationDateAfter(status, mismatchTypes, date)
     }
+
+    override fun findFirstOpenMismatchByTransactionId(transactionId: Long): InternalReconciliationResult? {
+        return jpaRepository.findFirstByTransactionIdAndStatusOrderByCreatedAtAsc(transactionId, ReconciliationStatus.OPEN)
+    }
 }

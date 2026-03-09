@@ -24,4 +24,9 @@ interface InternalReconciliationResultJpaRepository : JpaRepository<InternalReco
         mismatchTypes: List<MismatchType>,
         date: LocalDate
     ): List<InternalReconciliationResult>
+
+    fun findFirstByTransactionIdAndStatusOrderByCreatedAtAsc(
+        transactionId: Long,
+        status: ReconciliationStatus
+    ): InternalReconciliationResult?
 }

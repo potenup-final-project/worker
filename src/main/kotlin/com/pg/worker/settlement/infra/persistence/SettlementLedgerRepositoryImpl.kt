@@ -29,6 +29,10 @@ class SettlementLedgerRepositoryImpl(
         return jpaRepository.findAllByOriginalPaymentTxId(originalPaymentTxId)
     }
 
+    override fun findLatestByTransactionId(transactionId: Long): SettlementLedger? {
+        return jpaRepository.findFirstByTransactionIdOrderByCreatedAtDesc(transactionId)
+    }
+
     override fun findMerchantIdsBySettlementBaseDate(baseDate: LocalDate): List<Long> {
         val startDateTime = baseDate.atStartOfDay()
         val endDateTime = baseDate.plusDays(1).atStartOfDay()

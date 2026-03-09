@@ -25,4 +25,6 @@ interface InternalReconciliationResultRepository {
         mismatchTypes: List<MismatchType>,
         date: LocalDate
     ): List<InternalReconciliationResult>
+
+    fun findFirstOpenMismatchByTransactionId(transactionId: Long): InternalReconciliationResult?
 }
