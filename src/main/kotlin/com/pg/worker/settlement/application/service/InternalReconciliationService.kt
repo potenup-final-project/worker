@@ -34,8 +34,11 @@ class InternalReconciliationService(
 
         val stats = ReconciliationStats()
 
+        val txIds = transactions.map { it.id }
+        val allLedgers = ledgerRepository.findAllByTransactionIdIn(txIds).groupBy { it.transactionId }
+
         transactions.forEach { tx ->
-            val ledgers = ledgerRepository.findAllByTransactionId(tx.id)
+            val ledgers = allLedgers[tx.id] ?: emptyList()
             val expectedType = tx.type.toLedgerType()
             val sameTypeLedgers = ledgers.filter { it.ledgerType == expectedType }
 
@@ -139,10 +142,11 @@ class InternalReconciliationService(
 
             val ledgers = ledgersByTransactionId[result.transactionId] ?: emptyList()
             val expectedType = tx.type.toLedgerType()
+            val sameTypeLedgers = ledgers.filter { it.ledgerType == expectedType }
 
-            if (ledgers.size == 1 && ledgers.first().ledgerType == expectedType) {
+            if (sameTypeLedgers.size == 1) {
                 if (reconciliationWriter.resolveIfOpen(
-                        result.transactionId, result.mismatchType, ledgers.first().id, "재검사 과정에서 정상이 확인되어 해결됨"
+                        result.transactionId, result.mismatchType, sameTypeLedgers.first().id, "재검사 과정에서 정상이 확인되어 해결됨"
                     )
                 ) {
                     resolvedCount++

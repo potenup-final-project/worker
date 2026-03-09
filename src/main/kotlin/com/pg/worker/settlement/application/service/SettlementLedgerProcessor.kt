@@ -15,6 +15,7 @@ import org.springframework.dao.ConcurrencyFailureException
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.dao.DuplicateKeyException
 import org.springframework.dao.TransientDataAccessException
+import org.springframework.orm.ObjectOptimisticLockingFailureException
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
@@ -47,6 +48,8 @@ class SettlementLedgerProcessor(
             }
         } catch (e: DataIntegrityViolationException) {
             handleDataIntegrityViolation(raw, e)
+        } catch (e: ObjectOptimisticLockingFailureException) {
+            throw RetryableException("낙관적 락 충돌 (동시 수정 감지). eventId: ${raw.eventId}", e)
         } catch (e: ConcurrencyFailureException) {
             throw RetryableException("동시성 충돌(Deadlock 등)로 인한 재시도 가능. eventId: ${raw.eventId}", e)
         } catch (e: TransientDataAccessException) {
@@ -160,13 +163,17 @@ class SettlementLedgerProcessor(
     ): SettlementLedger {
         val cancelFee = calculateFee(raw.amount, originalLedger.policyFeeRate)
         val cancelSettlementAmount = raw.amount - cancelFee
+        val cancelSettlementBaseDate = raw.eventOccurredAt
+            .plusDays(originalLedger.policySettlementCycleDays.toLong())
+            .toLocalDate()
+            .atStartOfDay()
 
         return SettlementLedger.create(
             raw = raw,
             originalPaymentTxId = originalApproveRaw.transactionId,
             fee = cancelFee,
             settlementAmount = cancelSettlementAmount,
-            settlementBaseDate = originalLedger.settlementBaseDate,
+            settlementBaseDate = cancelSettlementBaseDate,
             settlementPolicyId = originalLedger.settlementPolicyId,
             policyFeeRate = originalLedger.policyFeeRate,
             policySettlementCycleDays = originalLedger.policySettlementCycleDays

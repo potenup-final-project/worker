@@ -9,6 +9,7 @@ import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
 import jakarta.persistence.Index
 import jakarta.persistence.Table
+import jakarta.persistence.Version
 import java.time.LocalDateTime
 
 @Entity
@@ -83,6 +84,10 @@ class SettlementRawData protected constructor(
 
     @Column(name = "created_at", nullable = false, updatable = false)
     val createdAt: LocalDateTime = LocalDateTime.now(),
+
+    @Version
+    @Column(name = "version", nullable = false)
+    var version: Long = 0,
 ) {
     companion object {
         fun create(

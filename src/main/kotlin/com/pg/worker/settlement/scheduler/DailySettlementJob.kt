@@ -28,10 +28,19 @@ class DailySettlementJob(
             val merchantIds = ledgerRepository.findMerchantIdsBySettlementBaseDate(targetDate)
             log.info("[정산-집계-배치] 대상 가맹점 수: {}", merchantIds.size)
 
-            // 가맹점별 집계 수행
+            // 가맹점별 집계 수행 (개별 실패가 전체 배치에 영향을 주지 않도록 예외 격리)
+            var successCount = 0
+            var failCount = 0
             merchantIds.forEach { merchantId ->
-                aggregationService.aggregateForMerchant(merchantId, targetDate)
+                try {
+                    aggregationService.aggregateForMerchant(merchantId, targetDate)
+                    successCount++
+                } catch (e: Exception) {
+                    failCount++
+                    log.error("[정산-집계-배치] 가맹점 집계 실패. merchantId={}, baseDate={}", merchantId, targetDate, e)
+                }
             }
+            log.info("[정산-집계-배치] 처리 결과. 성공={}, 실패={}", successCount, failCount)
 
             log.info("[정산-집계-배치] 종료.")
         } catch (e: Exception) {
