@@ -7,31 +7,31 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     hibernate:
-      ddl-auto: create
-    show-sql: true
+      ddl-auto: validate
+    show-sql: false
   h2:
     console:
       enabled: true
   data:
     redis:
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:}
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+      password: ${REDIS_PASSWORD}
 
 webhook:
   sqs:
-    enabled: ${WEBHOOK_SQS_ENABLED:false}
-    queue-url: ${WEBHOOK_SQS_QUEUE_URL:}
-    poll-interval-ms: ${WEBHOOK_SQS_POLL_INTERVAL_MS:1000}
-    max-messages: ${WEBHOOK_SQS_MAX_MESSAGES:10}
-    wait-time-seconds: ${WEBHOOK_SQS_WAIT_SECONDS:20}
-    visibility-timeout-seconds: ${WEBHOOK_SQS_VISIBILITY_TIMEOUT_SECONDS:30}
+    enabled: ${WEBHOOK_SQS_ENABLED}
+    queue-url: ${WEBHOOK_SQS_QUEUE_URL}
+    poll-interval-ms: ${WEBHOOK_SQS_POLL_INTERVAL_MS}
+    max-messages: ${WEBHOOK_SQS_MAX_MESSAGES}
+    wait-time-seconds: ${WEBHOOK_SQS_WAIT_SECONDS}
+    visibility-timeout-seconds: ${WEBHOOK_SQS_VISIBILITY_TIMEOUT_SECONDS}
   limiter:
     type: redis
     redis:
-      max-permits: ${WEBHOOK_LIMITER_REDIS_MAX_PERMITS:3}
-      permit-ttl-ms: ${WEBHOOK_LIMITER_REDIS_PERMIT_TTL_MS:30000}
-      fail-open: ${WEBHOOK_LIMITER_REDIS_FAIL_OPEN:false}
+      max-permits: ${WEBHOOK_LIMITER_REDIS_MAX_PERMITS}
+      permit-ttl-ms: ${WEBHOOK_LIMITER_REDIS_PERMIT_TTL_MS}
+      fail-open: ${WEBHOOK_LIMITER_REDIS_FAIL_OPEN}
   worker:
     batch-size: ${WORKER_BATCH_SIZE}
     interval-ms: ${WORKER_INTERVAL_MS}
@@ -45,16 +45,17 @@ webhook:
     connect-timeout-ms: ${HTTP_CONN_TIMEOUT}
     read-timeout-ms: ${HTTP_READ_TIMEOUT}
   secret:
-    # AES-256-GCM key: base64(32 bytes). ??? WEBHOOK_SECRET_KEY ????? ???? ?. ??? ? ?? ??.
     encryption-key: ${WEBHOOK_SECRET_KEY}
-    # ?????? ?? ? ??? false? ??. true? ??? ??.
     allow-plaintext-fallback: ${WEBHOOK_ALLOW_PLAINTEXT}
   endpoint:
-    # ????? ??? true. HTTP ??? ??? ??(?? ???)?? false? ??.
     require-https: ${WEBHOOK_REQUIRE_HTTPS}
 
 server:
   port: 8081
 
 aws:
-  region: ${AWS_REGION:ap-northeast-2}
+  region: ${AWS_REGION}
+
+logging:
+  pattern:
+    level: "%5p [traceId:%X{traceId} messageId:%X{messageId} eventId:%X{eventId} deliveryId:%X{deliveryId}]"
