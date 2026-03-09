@@ -40,25 +40,16 @@ class PaymentEventSqsConsumer(
         val command = try {
             objectMapper.readValue(message, RecordSettlementCommand::class.java)
         } catch (e: JsonProcessingException) {
-            log.error(
-                "[SQS-Consumer] [재시도 불가] JSON 파싱에 실패했습니다. rawMessage={}",
-                message.take(500),
-                e
-            )
+            log.error("[SQS-Consumer] [재시도 불가] JSON 파싱에 실패했습니다.", e)
             return
         } catch (e: Exception) {
-            log.error(
-                "[SQS-Consumer] [재시도 불가] 메시지 매핑에 실패했습니다. rawMessage={}",
-                message.take(500),
-                e
-            )
+            log.error("[SQS-Consumer] [재시도 불가] 메시지 매핑에 실패했습니다.", e)
             return
         }
 
         log.info(
-            "[SQS-Consumer] 메시지 파싱 완료. eventId={}, paymentKey={}, transactionType={}",
+            "[SQS-Consumer] 메시지 파싱 완료. eventId={}, transactionType={}",
             command.eventId,
-            command.paymentKey,
             command.transactionType
         )
 
@@ -71,9 +62,8 @@ class PaymentEventSqsConsumer(
              * 따라서 Ack 하면 안 되고, SQS 재시도 / DLQ 정책을 타도록 재시도 처리
              */
             log.error(
-                "[SQS-Consumer] [재시도 대상] 처리에 실패해 SQS 재시도를 유도합니다. eventId={}, error={}",
+                "[SQS-Consumer] [재시도 대상] 처리에 실패해 SQS 재시도를 유도합니다. eventId={}",
                 command.eventId,
-                e.message,
                 e
             )
             throw e

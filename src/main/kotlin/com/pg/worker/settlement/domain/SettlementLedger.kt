@@ -116,6 +116,26 @@ class SettlementLedger protected constructor(
             settlementAmount: Long,
             settlementBaseDate: LocalDateTime,
             policy: SettlementPolicy
+        ): SettlementLedger = create(
+            raw = raw,
+            originalPaymentTxId = originalPaymentTxId,
+            fee = fee,
+            settlementAmount = settlementAmount,
+            settlementBaseDate = settlementBaseDate,
+            settlementPolicyId = policy.id,
+            policyFeeRate = policy.feeRate,
+            policySettlementCycleDays = policy.settlementCycleDays
+        )
+
+        fun create(
+            raw: SettlementRawData,
+            originalPaymentTxId: Long?,
+            fee: Long,
+            settlementAmount: Long,
+            settlementBaseDate: LocalDateTime,
+            settlementPolicyId: Long,
+            policyFeeRate: BigDecimal,
+            policySettlementCycleDays: Int
         ): SettlementLedger {
             return SettlementLedger(
                 rawEventId = raw.eventId,
@@ -125,13 +145,13 @@ class SettlementLedger protected constructor(
                 originalPaymentTxId = originalPaymentTxId,
                 ledgerType = raw.transactionType,
                 amount = if (raw.transactionType == TransactionType.CANCEL) -raw.amount else raw.amount,
-                fee = fee,
-                settlementAmount = settlementAmount,
+                fee = if (raw.transactionType == TransactionType.CANCEL) -fee else fee,
+                settlementAmount = if (raw.transactionType == TransactionType.CANCEL) -settlementAmount else settlementAmount,
                 occurredAt = raw.eventOccurredAt,
                 settlementBaseDate = settlementBaseDate,
-                settlementPolicyId = policy.id,
-                policyFeeRate = policy.feeRate,
-                policySettlementCycleDays = policy.settlementCycleDays
+                settlementPolicyId = settlementPolicyId,
+                policyFeeRate = policyFeeRate,
+                policySettlementCycleDays = policySettlementCycleDays
             )
         }
     }

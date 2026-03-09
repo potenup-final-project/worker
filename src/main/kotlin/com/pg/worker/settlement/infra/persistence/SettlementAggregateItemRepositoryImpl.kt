@@ -8,10 +8,6 @@ import org.springframework.stereotype.Repository
 class SettlementAggregateItemRepositoryImpl(
     private val jpaRepository: SettlementAggregateItemJpaRepository
 ) : SettlementAggregateItemRepository {
-    override fun save(item: SettlementAggregateItem): SettlementAggregateItem {
-        return jpaRepository.save(item)
-    }
-
     override fun saveAll(items: List<SettlementAggregateItem>): List<SettlementAggregateItem> {
         return jpaRepository.saveAll(items)
     }

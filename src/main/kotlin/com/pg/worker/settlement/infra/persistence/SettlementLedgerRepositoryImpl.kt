@@ -25,6 +25,10 @@ class SettlementLedgerRepositoryImpl(
         return jpaRepository.findByRawEventId(rawEventId)
     }
 
+    override fun findAllByOriginalPaymentTxId(originalPaymentTxId: Long): List<SettlementLedger> {
+        return jpaRepository.findAllByOriginalPaymentTxId(originalPaymentTxId)
+    }
+
     override fun findMerchantIdsBySettlementBaseDate(baseDate: LocalDate): List<Long> {
         val startDateTime = baseDate.atStartOfDay()
         val endDateTime = baseDate.plusDays(1).atStartOfDay()
@@ -56,5 +60,13 @@ class SettlementLedgerRepositoryImpl(
                 qItem.id.isNull
             )
             .fetch()
+    }
+
+    override fun findAllByTransactionId(transactionId: Long): List<SettlementLedger> {
+        return jpaRepository.findAllByTransactionId(transactionId)
+    }
+
+    override fun findAllByTransactionIdIn(transactionIds: List<Long>): List<SettlementLedger> {
+        return jpaRepository.findAllByTransactionIdIn(transactionIds)
     }
 }
