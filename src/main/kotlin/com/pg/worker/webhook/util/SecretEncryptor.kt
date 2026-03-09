@@ -15,21 +15,19 @@ import javax.crypto.spec.SecretKeySpec
 class SecretEncryptor(
     @Value("\${webhook.secret.encryption-key}") encryptionKeyBase64: String,
 ) {
-    private val key: SecretKeySpec
+    private val key: SecretKeySpec = run {
+        val keyBytes = Base64.getDecoder().decode(encryptionKeyBase64)
+        if (keyBytes.size != 32) {
+            throw BusinessException(WebhookErrorCode.ENCRYPTION_KEY_SIZE_INVALID)
+        }
+        SecretKeySpec(keyBytes, KEY_ALGORITHM)
+    }
 
     companion object {
         private const val ALGORITHM = "AES/GCM/NoPadding"
         private const val IV_LENGTH = 12
         private const val TAG_BITS = 128
         private const val KEY_ALGORITHM = "AES"
-    }
-
-    init {
-        val keyBytes = Base64.getDecoder().decode(encryptionKeyBase64)
-        if(keyBytes.size != 32) {
-            throw BusinessException(WebhookErrorCode.ENCRYPTION_KEY_SIZE_INVALID)
-        }
-        key = SecretKeySpec(keyBytes, KEY_ALGORITHM)
     }
 
     fun encrypt(plaintext: String): String {

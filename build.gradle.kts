@@ -26,7 +26,7 @@ dependencies {
     // --- Spring Boot Starters ---
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-web")
-    implementation("org.springframework.boot:spring-boot-starter-cache")
+    implementation("org.springframework.boot:spring-boot-starter-actuator")
     developmentOnly("org.springframework.boot:spring-boot-devtools")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
 
@@ -43,8 +43,11 @@ dependencies {
     // --- Monitoring ---
     implementation("io.micrometer:micrometer-registry-prometheus")
 
-    // --- Cache ---
-    implementation("com.github.ben-manes.caffeine:caffeine")
+    // --- AWS SQS ---
+    implementation("software.amazon.awssdk:sqs:2.30.0")
+
+    // --- Redis ---
+    implementation("org.springframework.boot:spring-boot-starter-data-redis")
 
     implementation("com.fasterxml.jackson.core:jackson-core:2.17.2")
     implementation("com.fasterxml.jackson.core:jackson-annotations:2.17.2")
@@ -58,7 +61,6 @@ dependencies {
     kapt("jakarta.annotation:jakarta.annotation-api")
 
     // --- Testing ---
-    testImplementation("org.springframework.boot:spring-boot-starter-data-jpa-test")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
@@ -72,7 +74,7 @@ dependencies {
 
 kotlin {
     compilerOptions {
-        freeCompilerArgs.addAll("-Xjsr305=strict", "-Xannotation-default-target=param-property")
+        freeCompilerArgs.addAll("-Xjsr305=strict")
     }
 }
 

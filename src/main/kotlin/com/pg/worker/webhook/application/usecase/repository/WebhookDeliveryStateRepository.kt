@@ -1,6 +1,7 @@
 package com.pg.worker.webhook.application.usecase.repository
 
 import com.pg.worker.webhook.application.usecase.dto.ClaimedDelivery
+import com.pg.worker.webhook.application.usecase.repository.dto.DeliverySendOutcome
 import java.time.LocalDateTime
 import java.util.UUID
 
@@ -10,6 +11,7 @@ interface WebhookDeliveryStateRepository {
     fun markSuccessNewTransaction(deliveryId: Long, httpStatus: Int, responseMs: Long)
     fun markFailedNewTransaction(deliveryId: Long, httpStatus: Int?, errorCode: String, nextAt: LocalDateTime)
     fun markDeadNewTransaction(deliveryId: Long, httpStatus: Int?, errorCode: String)
+    fun applySendOutcomesNewTransaction(outcomes: List<DeliverySendOutcome>)
     fun recoverExpiredLeases(leaseMinutes: Int): Int
     /** claimDueBatch에서 증가된 attempt_no를 원복하고 FAILED로 되돌린다 (HTTP 시도 없이 claim 취소 시 사용) */
     fun revertClaim(deliveryId: Long)

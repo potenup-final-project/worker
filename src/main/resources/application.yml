@@ -14,6 +14,11 @@ spring:
   h2:
     console:
       enabled: true
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
 
   cloud:
     aws:
@@ -26,11 +31,19 @@ spring:
         endpoint: http://localhost:9324
 
 webhook:
+  sqs:
+    enabled: ${WEBHOOK_SQS_ENABLED}
+    queue-url: ${WEBHOOK_SQS_QUEUE_URL:}
+    poll-interval-ms: ${WEBHOOK_SQS_POLL_INTERVAL_MS}
+    max-messages: ${WEBHOOK_SQS_MAX_MESSAGES}
+    wait-time-seconds: ${WEBHOOK_SQS_WAIT_SECONDS}
+    visibility-timeout-seconds: ${WEBHOOK_SQS_VISIBILITY_TIMEOUT_SECONDS}
   limiter:
-    type: local
-    cache-name: ${CACHE_NAME}
-    maximum-size: ${LIMITER_MAX}
-    expire-after-access-seconds: ${CACHE_EXPIRE_AFTER}
+    type: redis
+    redis:
+      max-permits: ${WEBHOOK_LIMITER_REDIS_MAX_PERMITS}
+      permit-ttl-ms: ${WEBHOOK_LIMITER_REDIS_PERMIT_TTL_MS}
+      fail-open: ${WEBHOOK_LIMITER_REDIS_FAIL_OPEN}
   worker:
     batch-size: ${WORKER_BATCH_SIZE}
     interval-ms: ${WORKER_INTERVAL_MS}
@@ -51,3 +64,6 @@ webhook:
 
 server:
   port: 8081
+
+aws:
+  region: ${AWS_REGION}
