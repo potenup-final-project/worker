@@ -29,21 +29,13 @@ class SettlementLedgerRepositoryImpl(
         return jpaRepository.findAllByOriginalPaymentTxId(originalPaymentTxId)
     }
 
-    override fun findLatestByTransactionId(transactionId: Long): SettlementLedger? {
-        return jpaRepository.findFirstByTransactionIdOrderByCreatedAtDesc(transactionId)
-    }
-
     override fun findMerchantIdsBySettlementBaseDate(baseDate: LocalDate): List<Long> {
-        val startDateTime = baseDate.atStartOfDay()
-        val endDateTime = baseDate.plusDays(1).atStartOfDay()
-
         return queryFactory
             .select(qLedger.merchantId)
             .from(qLedger)
             .leftJoin(qItem).on(qLedger.id.eq(qItem.ledgerId))
             .where(
-                qLedger.settlementBaseDate.goe(startDateTime),
-                qLedger.settlementBaseDate.lt(endDateTime),
+                qLedger.settlementBaseDate.eq(baseDate),
                 qItem.id.isNull
             )
             .distinct()
@@ -51,19 +43,23 @@ class SettlementLedgerRepositoryImpl(
     }
 
     override fun findUnaggregatedLedgers(merchantId: Long, baseDate: LocalDate): List<SettlementLedger> {
-        val startDateTime = baseDate.atStartOfDay()
-        val endDateTime = baseDate.plusDays(1).atStartOfDay()
-
         return queryFactory
             .selectFrom(qLedger)
             .leftJoin(qItem).on(qLedger.id.eq(qItem.ledgerId))
             .where(
                 qLedger.merchantId.eq(merchantId),
-                qLedger.settlementBaseDate.goe(startDateTime),
-                qLedger.settlementBaseDate.lt(endDateTime),
+                qLedger.settlementBaseDate.eq(baseDate),
                 qItem.id.isNull
             )
             .fetch()
+    }
+
+    override fun findLatestByTransactionId(transactionId: Long): SettlementLedger? {
+        return queryFactory
+            .selectFrom(qLedger)
+            .where(qLedger.transactionId.eq(transactionId))
+            .orderBy(qLedger.id.desc())
+            .fetchFirst()
     }
 
     override fun findAllByTransactionId(transactionId: Long): List<SettlementLedger> {

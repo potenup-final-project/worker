@@ -100,7 +100,7 @@ class SettlementLedgerProcessor(
     private fun buildApproveLedger(raw: SettlementRawData, policy: SettlementPolicy): SettlementLedger {
         val fee = calculateFee(raw.amount, policy.feeRate)
         val settlementAmount = raw.amount - fee
-        val settlementBaseDate = raw.eventOccurredAt.plusDays(policy.settlementCycleDays.toLong())
+        val settlementBaseDate = raw.eventOccurredAt.plusDays(policy.settlementCycleDays.toLong()).toLocalDate()
 
         return SettlementLedger.create(
             raw = raw,
@@ -166,7 +166,6 @@ class SettlementLedgerProcessor(
         val cancelSettlementBaseDate = raw.eventOccurredAt
             .plusDays(originalLedger.policySettlementCycleDays.toLong())
             .toLocalDate()
-            .atStartOfDay()
 
         return SettlementLedger.create(
             raw = raw,

@@ -10,6 +10,7 @@ import jakarta.persistence.Id
 import jakarta.persistence.Index
 import jakarta.persistence.Table
 import java.math.BigDecimal
+import java.time.LocalDate
 import java.time.LocalDateTime
 
 @Entity
@@ -82,7 +83,7 @@ class SettlementLedger protected constructor(
      * 가맹점 일자별 집계의 핵심 기준 컬럼.
      */
     @Column(name = "settlement_base_date", nullable = false, updatable = false)
-    val settlementBaseDate: LocalDateTime,
+    val settlementBaseDate: LocalDate,
 
     /**
      * ledger 계산 시 참조한 정산 정책 ID.
@@ -114,7 +115,7 @@ class SettlementLedger protected constructor(
             originalPaymentTxId: Long?,
             fee: Long,
             settlementAmount: Long,
-            settlementBaseDate: LocalDateTime,
+            settlementBaseDate: LocalDate,
             policy: SettlementPolicy
         ): SettlementLedger = create(
             raw = raw,
@@ -132,7 +133,7 @@ class SettlementLedger protected constructor(
             originalPaymentTxId: Long?,
             fee: Long,
             settlementAmount: Long,
-            settlementBaseDate: LocalDateTime,
+            settlementBaseDate: LocalDate,
             settlementPolicyId: Long,
             policyFeeRate: BigDecimal,
             policySettlementCycleDays: Int
