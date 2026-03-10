@@ -12,20 +12,6 @@ class ExternalReconciliationJob(
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
-    /**
-     * 매일 새벽 3시 30분에 전날(T-1) 외부 대사를 수행한다.
-     *
-     * 실행 순서:
-     *   02:00 - DailySettlementJob        (정산 집계)
-     *   03:00 - InternalReconciliationJob (내부 대사)
-     *   03:30 - SettlementReconciliationJob (외부 대사) ← 여기
-     *
-     * 내부 대사(03:00) 완료 이후 실행함으로써
-     * 내부 원장이 모두 정리된 상태에서 외부 대사를 수행한다.
-     *
-     * 대사 기준일: LocalDate.now().minusDays(1) (T-1 전일자)
-     * 예) 3월 10일 03:30 실행 → 3월 9일 거래 대상
-     */
     @Scheduled(cron = "0 30 3 * * *")
     fun runDailyExternalReconciliation() {
         val targetDate = LocalDate.now().minusDays(1)
