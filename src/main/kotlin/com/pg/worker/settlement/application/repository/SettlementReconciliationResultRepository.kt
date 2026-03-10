@@ -14,6 +14,8 @@ interface SettlementReconciliationResultRepository {
         reconciliationDate: LocalDate,
     ): Boolean
 
+    fun findById(id: Long): SettlementReconciliationResult?
+
     /** Writer에서 기존 OPEN 결과 조회 후 RESOLVED 전환 시 사용 */
     fun findByProviderTxIdAndReconciliationDate(
         providerTxId: String,
@@ -37,7 +39,4 @@ interface SettlementReconciliationResultRepository {
         reconciliationDate: LocalDate,
         resultType: SettlementReconciliationResultType,
     ): List<SettlementReconciliationResult>
-
-    /** 단건 상세 조회 */
-    fun findById(id: Long): SettlementReconciliationResult?
 }

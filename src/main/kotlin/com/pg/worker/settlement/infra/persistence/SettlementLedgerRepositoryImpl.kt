@@ -62,10 +62,6 @@ class SettlementLedgerRepositoryImpl(
             .fetchFirst()
     }
 
-    override fun findAllByTransactionId(transactionId: Long): List<SettlementLedger> {
-        return jpaRepository.findAllByTransactionId(transactionId)
-    }
-
     override fun findAllByTransactionIdIn(transactionIds: List<Long>): List<SettlementLedger> {
         return jpaRepository.findAllByTransactionIdIn(transactionIds)
     }

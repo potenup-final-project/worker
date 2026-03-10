@@ -78,10 +78,6 @@ class SettlementRawDataRepositoryImpl(
         return jpaRepository.findAllByEventOccurredAtBetween(from, to)
     }
 
-    override fun findAllByProviderTxIdIn(providerTxIds: List<String>): List<SettlementRawData> {
-        return jpaRepository.findAllByProviderTxIdIn(providerTxIds)
-    }
-
     companion object {
         private const val JPA_LOCK_TIMEOUT_HINT = "jakarta.persistence.lock.timeout"
         private const val SKIP_LOCKED = -2
