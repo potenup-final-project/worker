@@ -12,6 +12,7 @@ class RequiredPropertiesValidator(
     @PostConstruct
     fun validate() {
         val required = listOf(
+            "DB_URL",
             "DB_USER",
             "DB_PASSWORD",
             "AWS_REGION",
