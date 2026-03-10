@@ -13,14 +13,6 @@ import jakarta.persistence.UniqueConstraint
 import java.time.LocalDate
 import java.time.LocalDateTime
 
-/**
- * 외부 카드사/PG 정산 파일과 내부 [SettlementRawData]를 비교한 대사 결과 저장 엔티티.
- *
- * 매칭 기준: [providerTxId] (외부 카드사 거래 식별자)
- * 비교 항목: amount(원금), transactionType(승인/취소)
- *
- * unique constraint (provider_tx_id, reconciliation_date) 로 배치 재실행 시 중복 생성 방지.
- */
 @Entity
 @Table(
     name = "settlement_reconciliation_results",
@@ -40,17 +32,12 @@ class SettlementReconciliationResult protected constructor(
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long = 0,
 
-    /** 대사 실행 기준일 (T-1 기준) */
     @Column(name = "reconciliation_date", nullable = false, updatable = false)
     val reconciliationDate: LocalDate,
 
     @Column(name = "merchant_id")
     val merchantId: Long?,
 
-    /**
-     * 매칭 핵심 키. 카드사/PG사 거래 식별자.
-     * MISSING_INTERNAL인 경우 외부 providerTxId, MISSING_EXTERNAL인 경우 내부 providerTxId.
-     */
     @Column(name = "provider_tx_id", length = 80, nullable = false, updatable = false)
     val providerTxId: String,
 
@@ -74,14 +61,9 @@ class SettlementReconciliationResult protected constructor(
     @Column(name = "external_amount")
     val externalAmount: Long? = null,
 
-    /**
-     * 금액 차이 (externalAmount - internalAmount).
-     * AMOUNT_MISMATCH 시 원인 파악용.
-     */
     @Column(name = "amount_diff")
     val amountDiff: Long? = null,
 
-    /** 대사 결과 상태. 기존 [ReconciliationStatus] 재사용 */
     @Enumerated(EnumType.STRING)
     @Column(name = "status", length = 20, nullable = false)
     var status: ReconciliationStatus = ReconciliationStatus.OPEN,
@@ -127,7 +109,7 @@ class SettlementReconciliationResult protected constructor(
             internalAmount = internalAmount,
             externalAmount = externalAmount,
             amountDiff = 0L,
-            status = ReconciliationStatus.RESOLVED, // MATCHED는 즉시 RESOLVED
+            status = ReconciliationStatus.RESOLVED,
         )
 
         fun mismatch(
