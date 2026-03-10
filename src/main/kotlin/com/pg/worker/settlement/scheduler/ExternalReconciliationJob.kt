@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component
 import java.time.LocalDate
 
 @Component
-class SettlementReconciliationJob(
+class ExternalReconciliationJob(
     private val reconciliationEngine: SettlementReconciliationEngine,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
