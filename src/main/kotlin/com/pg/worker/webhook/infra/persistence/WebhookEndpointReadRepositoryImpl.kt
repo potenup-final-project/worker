@@ -19,6 +19,7 @@ class WebhookEndpointReadRepositoryImpl(
             .where(
                 qEndpoint.merchantId.eq(merchantId),
                 qEndpoint.endpointId.`in`(endpointIds),
+                qEndpoint.isActive.eq(true),
             )
             .fetch()
     }

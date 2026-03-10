@@ -10,8 +10,6 @@ import jakarta.persistence.Id
 import jakarta.persistence.Index
 import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
-import org.hibernate.annotations.JdbcTypeCode
-import org.hibernate.type.SqlTypes
 import java.time.LocalDateTime
 import java.util.UUID
 
@@ -32,6 +30,15 @@ class WebhookDelivery protected constructor(
 
     @Column(length = 36, nullable = false, updatable = false)
     val eventId: UUID,
+
+    @Column(length = 64, nullable = false, updatable = false)
+    val messageId: String,
+
+    @Column(length = 128, updatable = false)
+    val traceId: String?,
+
+    @Column(length = 64, nullable = false, updatable = false)
+    val eventType: String,
 
     @Column(nullable = false, updatable = false)
     val endpointId: Long,
@@ -78,11 +85,17 @@ class WebhookDelivery protected constructor(
     companion object {
         fun create(
             eventId: UUID,
+            messageId: String,
+            traceId: String?,
+            eventType: String,
             endpointId: Long,
             merchantId: Long,
             payloadSnapshot: String,
         ): WebhookDelivery = WebhookDelivery(
             eventId = eventId,
+            messageId = messageId,
+            traceId = traceId,
+            eventType = eventType,
             endpointId = endpointId,
             merchantId = merchantId,
             payloadSnapshot = payloadSnapshot,

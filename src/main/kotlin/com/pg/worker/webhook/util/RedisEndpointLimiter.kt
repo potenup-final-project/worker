@@ -14,7 +14,7 @@ class RedisEndpointLimiter(
     private val redisTemplate: StringRedisTemplate,
     @Value("\${webhook.limiter.redis.max-permits}") private val maxPermits: Int,
     @Value("\${webhook.limiter.redis.permit-ttl-ms}") private val permitTtlMs: Long,
-    @Value("\${webhook.limiter.redis.fail-open:false}") private val failOpen: Boolean,
+    @Value("\${webhook.limiter.redis.fail-open}") private val failOpen: Boolean,
 ) : EndpointConcurrencyLimiter {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -57,12 +57,12 @@ class RedisEndpointLimiter(
                 local max_permits = tonumber(ARGV[1])
                 local ttl_ms = tonumber(ARGV[2])
 
-                local current = tonumber(redis.call('GET', key) or '0')
-                if current >= max_permits then
+                local current = tonumber(redis.call('INCR', key))
+                if current > max_permits then
+                  redis.call('DECR', key)
                   return 0
                 end
 
-                current = tonumber(redis.call('INCR', key))
                 redis.call('PEXPIRE', key, ttl_ms)
                 return 1
                 """.trimIndent()
