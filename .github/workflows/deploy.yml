@@ -9,7 +9,7 @@ jobs:
   build:
     uses: ./.github/workflows/reusable-build-and-push.yml
     with:
-      image_name: potenup/pg-core
+      image_name: potenup/pg-worker
       platforms: linux/amd64
     secrets:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -28,7 +28,7 @@ jobs:
         run: docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" -p "${{ secrets.DOCKERHUB_TOKEN }}"
 
       - name: Pull new image
-        run: docker pull potenup/pg-core:${{ needs.build.outputs.image_tag }}
+        run: docker pull potenup/pg-worker:${{ needs.build.outputs.image_tag }}
 
       - name: Stop and remove old container
         run: |
@@ -39,10 +39,10 @@ jobs:
         run: |
           docker run -d \
             --name potenup \
-            --env-file /home/ec2-user/app/pg-core.env \
+            --env-file /home/ec2-user/app/pg-worker.env \
             -p 8080:8080 \
             --restart always \
-            potenup/pg-core:${{ needs.build.outputs.image_tag }}
+            potenup/pg-worker:${{ needs.build.outputs.image_tag }}
 
       - name: Cleanup dangling images
         run: docker image prune -f
