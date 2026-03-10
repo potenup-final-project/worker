@@ -6,7 +6,7 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: update
     show-sql: false
   h2:
     console:
@@ -28,6 +28,19 @@ spring:
         endpoint: http://localhost:9324
 
 webhook:
+  recon:
+    enabled: ${WEBHOOK_RECON_ENABLED}
+    chunk-size: ${WEBHOOK_RECON_CHUNK_SIZE}
+    max-pages: ${WEBHOOK_RECON_MAX_PAGES}
+    stale-grace-minutes: ${WEBHOOK_RECON_STALE_GRACE_MINUTES}
+    stale-age-hours: ${WEBHOOK_RECON_STALE_AGE_HOURS}
+    degraded-window-days: ${WEBHOOK_RECON_DEGRADED_WINDOW_DAYS}
+    degraded-min-sample: ${WEBHOOK_RECON_DEGRADED_MIN_SAMPLE}
+    degraded-dead-rate: ${WEBHOOK_RECON_DEGRADED_DEAD_RATE}
+    degraded-recovery-window-days: ${WEBHOOK_RECON_DEGRADED_RECOVERY_WINDOW_DAYS}
+    missing-grace-minutes: ${WEBHOOK_RECON_MISSING_GRACE_MINUTES}
+    lookback-days: ${WEBHOOK_RECON_LOOKBACK_DAYS}
+    auto-ddl: ${WEBHOOK_RECON_AUTO_DDL}
   sqs:
     enabled: ${WEBHOOK_SQS_ENABLED}
     queue-url: ${WEBHOOK_SQS_QUEUE_URL}
@@ -64,6 +77,13 @@ server:
 
 aws:
   region: ${AWS_REGION}
+
+pgcore:
+  read-datasource:
+    url: ${PGCORE_READ_DB_URL}
+    username: ${PGCORE_READ_DB_USER}
+    password: ${PGCORE_READ_DB_PASSWORD}
+    driver-class-name: ${PGCORE_READ_DB_DRIVER}
 
 logging:
   pattern:
