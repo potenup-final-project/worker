@@ -10,6 +10,7 @@ import jakarta.persistence.Id
 import jakarta.persistence.Index
 import jakarta.persistence.Table
 import java.math.BigDecimal
+import java.time.LocalDate
 import java.time.LocalDateTime
 
 @Entity
@@ -82,7 +83,7 @@ class SettlementLedger protected constructor(
      * 가맹점 일자별 집계의 핵심 기준 컬럼.
      */
     @Column(name = "settlement_base_date", nullable = false, updatable = false)
-    val settlementBaseDate: LocalDateTime,
+    val settlementBaseDate: LocalDate,
 
     /**
      * ledger 계산 시 참조한 정산 정책 ID.
@@ -114,8 +115,28 @@ class SettlementLedger protected constructor(
             originalPaymentTxId: Long?,
             fee: Long,
             settlementAmount: Long,
-            settlementBaseDate: LocalDateTime,
+            settlementBaseDate: LocalDate,
             policy: SettlementPolicy
+        ): SettlementLedger = create(
+            raw = raw,
+            originalPaymentTxId = originalPaymentTxId,
+            fee = fee,
+            settlementAmount = settlementAmount,
+            settlementBaseDate = settlementBaseDate,
+            settlementPolicyId = policy.id,
+            policyFeeRate = policy.feeRate,
+            policySettlementCycleDays = policy.settlementCycleDays
+        )
+
+        fun create(
+            raw: SettlementRawData,
+            originalPaymentTxId: Long?,
+            fee: Long,
+            settlementAmount: Long,
+            settlementBaseDate: LocalDate,
+            settlementPolicyId: Long,
+            policyFeeRate: BigDecimal,
+            policySettlementCycleDays: Int
         ): SettlementLedger {
             return SettlementLedger(
                 rawEventId = raw.eventId,
@@ -125,13 +146,13 @@ class SettlementLedger protected constructor(
                 originalPaymentTxId = originalPaymentTxId,
                 ledgerType = raw.transactionType,
                 amount = if (raw.transactionType == TransactionType.CANCEL) -raw.amount else raw.amount,
-                fee = fee,
-                settlementAmount = settlementAmount,
+                fee = if (raw.transactionType == TransactionType.CANCEL) -fee else fee,
+                settlementAmount = if (raw.transactionType == TransactionType.CANCEL) -settlementAmount else settlementAmount,
                 occurredAt = raw.eventOccurredAt,
                 settlementBaseDate = settlementBaseDate,
-                settlementPolicyId = policy.id,
-                policyFeeRate = policy.feeRate,
-                policySettlementCycleDays = policy.settlementCycleDays
+                settlementPolicyId = settlementPolicyId,
+                policyFeeRate = policyFeeRate,
+                policySettlementCycleDays = policySettlementCycleDays
             )
         }
     }

@@ -7,4 +7,8 @@ import org.springframework.stereotype.Repository
 @Repository
 interface SettlementLedgerJpaRepository : JpaRepository<SettlementLedger, Long> {
     fun findByRawEventId(rawEventId: String): SettlementLedger?
+    fun findAllByOriginalPaymentTxId(originalPaymentTxId: Long): List<SettlementLedger>
+    fun findAllByTransactionId(transactionId: Long): List<SettlementLedger>
+    fun findAllByTransactionIdIn(transactionIds: List<Long>): List<SettlementLedger>
+    fun findFirstByTransactionIdOrderByCreatedAtDesc(transactionId: Long): SettlementLedger?
 }

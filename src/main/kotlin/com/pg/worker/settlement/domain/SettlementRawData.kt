@@ -9,6 +9,7 @@ import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
 import jakarta.persistence.Index
 import jakarta.persistence.Table
+import jakarta.persistence.Version
 import java.time.LocalDateTime
 
 @Entity
@@ -17,6 +18,7 @@ import java.time.LocalDateTime
     indexes = [
         Index(name = "idx_raw_event_id", columnList = "event_id", unique = true),
         Index(name = "idx_raw_status_retry", columnList = "status, next_retry_at"),
+        Index(name = "idx_raw_status_claimed", columnList = "status, claimed_at"),
         Index(name = "idx_raw_payment_key", columnList = "payment_key")
     ]
 )
@@ -74,11 +76,18 @@ class SettlementRawData protected constructor(
     @Column(name = "last_tried_at")
     var lastTriedAt: LocalDateTime? = null,
 
+    @Column(name = "claimed_at")
+    var claimedAt: LocalDateTime? = null,
+
     @Column(name = "failure_reason", length = 500)
     var failureReason: String? = null,
 
     @Column(name = "created_at", nullable = false, updatable = false)
     val createdAt: LocalDateTime = LocalDateTime.now(),
+
+    @Version
+    @Column(name = "version", nullable = false)
+    var version: Long = 0,
 ) {
     companion object {
         fun create(
@@ -100,18 +109,26 @@ class SettlementRawData protected constructor(
         }
     }
 
+    fun claim() {
+        this.status = RawDataStatus.PROCESSING
+        this.claimedAt = LocalDateTime.now()
+    }
+
     fun markProcessed() {
         this.status = RawDataStatus.PROCESSED
         this.lastTriedAt = LocalDateTime.now()
         this.failureReason = null
         this.nextRetryAt = null
+        this.claimedAt = null
     }
 
     fun markPendingDependency(reason: String, nextRetryAt: LocalDateTime) {
         this.status = RawDataStatus.PENDING_DEPENDENCY
         this.failureReason = reason
+        this.retryCount++
         this.nextRetryAt = nextRetryAt
         this.lastTriedAt = LocalDateTime.now()
+        this.claimedAt = null
     }
 
     fun markFailedRetryable(reason: String, nextRetryAt: LocalDateTime) {
@@ -120,6 +137,7 @@ class SettlementRawData protected constructor(
         this.retryCount++
         this.nextRetryAt = nextRetryAt
         this.lastTriedAt = LocalDateTime.now()
+        this.claimedAt = null
     }
 
     fun markFailedNonRetryable(reason: String) {
@@ -127,5 +145,6 @@ class SettlementRawData protected constructor(
         this.failureReason = reason
         this.lastTriedAt = LocalDateTime.now()
         this.nextRetryAt = null
+        this.claimedAt = null
     }
 }
