@@ -22,87 +22,56 @@ class RecordSettlementService(
             log.info("[Settlement] 이미 처리된 Raw 이벤트이므로 종료. eventId={}", command.eventId)
             return
         }
-        val rawId = raw.id
 
         try {
-            ledgerProcessor.process(rawId)
+            ledgerProcessor.process(raw.id)
             log.info("[Settlement] 정산 처리 완료. eventId={}", command.eventId)
-        } catch (e: PendingDependencyException) {
-            log.info("[Settlement] 의존성 미충족 대기. eventId={}, reason={}", command.eventId, e.message)
-            safelyUpdatePending(rawId, e, command.eventId)
-        } catch (e: NonRetryableException) {
-            log.error("[Settlement] 비즈니스/정합성 오류 (영구 실패). eventId={}, reason={}", command.eventId, e.message)
-            safelyUpdateNonRetryable(rawId, e, command.eventId)
-        } catch (e: RetryableException) {
-            log.warn("[Settlement] 기술적 일시 오류 (재시도 대상). eventId={}, reason={}", command.eventId, e.message)
-            safelyUpdateRetryable(rawId, e, command.eventId)
         } catch (e: Exception) {
-            /**
-             * [운영 정책: 예상치 못한 예외 처리]
-             * 로직 오류(NPE, ClassCast 등)나 코딩 버그는 재시도해도 성공 가능성이 낮으므로
-             * 앱 내부 상태를 NON_RETRYABLE로 기록하고 운영 개입을 유도한다.
-             *
-             * 단, 이 상태 기록 자체가 실패하면 SQS 재시도를 위해 예외를 다시 던진다.
-             */
-            log.error(
-                "[Settlement] [CRITICAL] 예상치 못한 시스템 오류 발생. 즉시 확인 필요. eventId={}, error={}",
-                command.eventId,
-                e.message,
-                e
-            )
-            safelyUpdateNonRetryable(
-                rawId = rawId,
-                cause = e,
-                eventId = command.eventId,
-                reason = "Unexpected System Error: ${e.message}"
-            )
+            handleProcessingFailure(raw.id, command.eventId, e)
         }
     }
 
-    private fun safelyUpdatePending(rawId: Long, cause: Exception, eventId: String) {
-        try {
-            statusUpdater.updateToPending(rawId, cause.message ?: "Dependency missing")
-        } catch (updateEx: Exception) {
-            log.error(
-                "[Settlement] 상태 업데이트 실패(PENDING). SQS 재시도를 위해 예외 재전파. eventId={}, rawId={}",
-                eventId,
-                rawId,
-                updateEx
-            )
-            throw updateEx
+    private fun handleProcessingFailure(rawId: Long, eventId: String, e: Exception) {
+        when (e) {
+            is PendingDependencyException -> {
+                log.info("[Settlement] 의존성 미충족 대기. eventId={}, reason={}", eventId, e.message)
+                updateStatusOrRethrow(rawId, eventId, "PENDING") {
+                    statusUpdater.updateToPending(rawId, e.message ?: "Dependency missing")
+                }
+            }
+            is NonRetryableException -> {
+                log.error("[Settlement] 비즈니스/정합성 오류 (영구 실패). eventId={}, reason={}", eventId, e.message)
+                updateStatusOrRethrow(rawId, eventId, "NON_RETRYABLE") {
+                    statusUpdater.updateToFailedNonRetryable(rawId, e.message ?: "Non-retryable error")
+                }
+            }
+            is RetryableException -> {
+                log.warn("[Settlement] 기술적 일시 오류 (재시도 대상). eventId={}, reason={}", eventId, e.message)
+                updateStatusOrRethrow(rawId, eventId, "RETRYABLE") {
+                    statusUpdater.updateToFailedRetryable(rawId, e.message ?: "Transient error")
+                }
+            }
+            else -> {
+                log.error(
+                    "[Settlement] [CRITICAL] 예상치 못한 시스템 오류 발생. 즉시 확인 필요. eventId={}, error={}",
+                    eventId, e.message, e
+                )
+                updateStatusOrRethrow(rawId, eventId, "NON_RETRYABLE") {
+                    statusUpdater.updateToFailedNonRetryable(rawId, "Unexpected System Error: ${e.message}")
+                }
+            }
         }
     }
 
-    private fun safelyUpdateRetryable(rawId: Long, cause: Exception, eventId: String) {
+    private inline fun updateStatusOrRethrow(rawId: Long, eventId: String, statusLabel: String, update: () -> Unit) {
         try {
-            statusUpdater.updateToFailedRetryable(rawId, cause.message ?: "Transient error")
-        } catch (updateEx: Exception) {
+            update()
+        } catch (e: Exception) {
             log.error(
-                "[Settlement] 상태 업데이트 실패(RETRYABLE). SQS 재시도를 위해 예외 재전파. eventId={}, rawId={}",
-                eventId,
-                rawId,
-                updateEx
+                "[Settlement] 상태 업데이트 실패({}). SQS 재시도를 위해 예외 재전파. eventId={}, rawId={}",
+                statusLabel, eventId, rawId, e
             )
-            throw updateEx
-        }
-    }
-
-    private fun safelyUpdateNonRetryable(
-        rawId: Long,
-        cause: Exception,
-        eventId: String,
-        reason: String = cause.message ?: "Non-retryable error"
-    ) {
-        try {
-            statusUpdater.updateToFailedNonRetryable(rawId, reason)
-        } catch (updateEx: Exception) {
-            log.error(
-                "[Settlement] 상태 업데이트 실패(NON_RETRYABLE). SQS 재시도를 위해 예외 재전파. eventId={}, rawId={}",
-                eventId,
-                rawId,
-                updateEx
-            )
-            throw updateEx
+            throw e
         }
     }
 }

@@ -17,7 +17,13 @@ class SettlementStatusUpdater(
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     fun updateToPending(rawId: Long, reason: String) {
         rawRepository.findById(rawId)?.apply {
-            markPendingDependency(reason, LocalDateTime.now().plusMinutes(SettlementRetryPolicy.PENDING_DELAY_MINUTES))
+            if (this.retryCount >= SettlementRetryPolicy.MAX_RETRY_COUNT) {
+                log.error("[Settlement] [PENDING_EXHAUSTED] 의존성 대기 임계치 초과. 영구 실패 처리. rawId={}, retryCount={}", 
+                    rawId, this.retryCount)
+                markFailedNonRetryable("Pending dependency timeout: $reason")
+            } else {
+                markPendingDependency(reason, LocalDateTime.now().plusMinutes(SettlementRetryPolicy.PENDING_DELAY_MINUTES))
+            }
             rawRepository.save(this)
         } ?: log.warn("[Settlement] [Updater] PENDING 상태 전이 실패. 데이터를 찾을 수 없음. rawId={}, reason={}", rawId, reason)
     }
@@ -25,7 +31,13 @@ class SettlementStatusUpdater(
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     fun updateToFailedRetryable(rawId: Long, reason: String) {
         rawRepository.findById(rawId)?.apply {
-            markFailedRetryable(reason, LocalDateTime.now().plusMinutes(SettlementRetryPolicy.RETRY_DELAY_MINUTES))
+            if (this.retryCount >= SettlementRetryPolicy.MAX_RETRY_COUNT) {
+                log.error("[Settlement] [RETRY_EXHAUSTED] 최대 재시도 횟수 초과. 영구 실패 처리. rawId={}, retryCount={}", 
+                    rawId, this.retryCount)
+                markFailedNonRetryable("Max retry exhausted: $reason")
+            } else {
+                markFailedRetryable(reason, LocalDateTime.now().plusMinutes(SettlementRetryPolicy.RETRY_DELAY_MINUTES))
+            }
             rawRepository.save(this)
         } ?: log.warn("[Settlement] [Updater] RETRYABLE 상태 전이 실패. 데이터를 찾을 수 없음. rawId={}, reason={}", rawId, reason)
     }
