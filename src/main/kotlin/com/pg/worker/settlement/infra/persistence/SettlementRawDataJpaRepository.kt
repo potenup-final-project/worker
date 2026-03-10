@@ -8,4 +8,5 @@ interface SettlementRawDataJpaRepository : JpaRepository<SettlementRawData, Long
     fun existsByEventId(eventId: String): Boolean
     fun findByPaymentKeyAndTransactionType(paymentKey: String, type: TransactionType): SettlementRawData?
     fun findByTransactionId(transactionId: Long): SettlementRawData?
+    fun findAllByTransactionIdIn(transactionIds: List<Long>): List<SettlementRawData>
 }

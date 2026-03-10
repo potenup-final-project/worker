@@ -3,6 +3,7 @@ package com.pg.worker.settlement.application.service
 import com.pg.worker.settlement.application.repository.InternalReconciliationResultRepository
 import com.pg.worker.settlement.application.repository.PaymentTransactionRepository
 import com.pg.worker.settlement.application.repository.SettlementLedgerRepository
+import com.pg.worker.settlement.application.repository.SettlementRawDataRepository
 import com.pg.worker.settlement.domain.*
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -13,13 +14,15 @@ import java.time.LocalDate
 class InternalReconciliationService(
     private val paymentTransactionRepository: PaymentTransactionRepository,
     private val ledgerRepository: SettlementLedgerRepository,
+    private val rawDataRepository: SettlementRawDataRepository,
     private val reconciliationResultRepository: InternalReconciliationResultRepository,
     private val reconciliationWriter: InternalReconciliationWriter
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
     private data class ReconciliationStats(
-        var missing: Int = 0,
+        var missingRawData: Int = 0,
+        var missingLedger: Int = 0,
         var duplicated: Int = 0,
         var typeMismatch: Int = 0,
         var amountMismatch: Int = 0,
@@ -36,6 +39,7 @@ class InternalReconciliationService(
 
         val txIds = transactions.map { it.id }
         val allLedgers = ledgerRepository.findAllByTransactionIdIn(txIds).groupBy { it.transactionId }
+        val allRawData = rawDataRepository.findAllByTransactionIdIn(txIds).groupBy { it.transactionId }
 
         transactions.forEach { tx ->
             val ledgers = allLedgers[tx.id] ?: emptyList()
@@ -52,7 +56,11 @@ class InternalReconciliationService(
                 }
 
                 ledgers.isEmpty() -> {
-                    if (detectMissingLedger(tx, targetDate)) stats.missing++
+                    val rawDataExists = allRawData[tx.id]?.isNotEmpty() == true
+                    when {
+                        rawDataExists -> if (detectMissingLedger(tx, targetDate)) stats.missingLedger++
+                        else -> if (detectMissingRawData(tx, targetDate)) stats.missingRawData++
+                    }
                 }
 
                 else -> {
@@ -64,8 +72,9 @@ class InternalReconciliationService(
         }
 
         log.info(
-            "[내부대사-신규] 종료. 결과 요약: MISSING={}, DUPLICATED={}, TYPE_MISMATCH={}, AMOUNT_MISMATCH={}",
-            stats.missing,
+            "[내부대사-신규] 종료. 결과 요약: MISSING_RAW_DATA={}, MISSING_LEDGER={}, DUPLICATED={}, TYPE_MISMATCH={}, AMOUNT_MISMATCH={}",
+            stats.missingRawData,
+            stats.missingLedger,
             stats.duplicated,
             stats.typeMismatch,
             stats.amountMismatch
@@ -89,29 +98,34 @@ class InternalReconciliationService(
 
     private fun detectMissingLedger(tx: PaymentTransaction, targetDate: LocalDate): Boolean =
         reconciliationWriter.writeMismatch(
-            tx, targetDate, MismatchType.MISSING_LEDGER, "결제 성공 거래에 대응하는 정산 원장이 존재하지 않음"
+            tx, targetDate, MismatchType.MISSING_LEDGER, "이벤트는 수신되었으나 정산 원장이 생성되지 않음 (워커 처리 실패 가능성)"
         )
+
+    private fun detectMissingRawData(tx: PaymentTransaction, targetDate: LocalDate): Boolean =
+        reconciliationWriter.writeMismatch(
+            tx, targetDate, MismatchType.MISSING_RAW_DATA, "이벤트 자체가 수신되지 않음 (RawData 없음)"
+        )
+
+    private fun detectAmountMismatch(
+        tx: PaymentTransaction, ledger: SettlementLedger, targetDate: LocalDate
+    ): Boolean {
+        val comparableLedgerAmount = kotlin.math.abs(ledger.amount)
+        val reason = when (tx.type) {
+            PaymentTxType.CANCEL -> "정산 원장의 금액이 일치하지 않음 (거래금액=${tx.requestedAmount}, 원장금액(절댓값)=$comparableLedgerAmount)"
+            PaymentTxType.APPROVE -> "정산 원장의 금액이 일치하지 않음 (거래금액=${tx.requestedAmount}, 원장금액=$comparableLedgerAmount)"
+        }
+        return reconciliationWriter.writeMismatch(tx, targetDate, MismatchType.AMOUNT_MISMATCH, reason)
+    }
 
     private fun isAmountMatched(tx: PaymentTransaction, ledger: SettlementLedger): Boolean {
         val comparableLedgerAmount = kotlin.math.abs(ledger.amount)
         return tx.requestedAmount == comparableLedgerAmount
     }
 
-    private fun detectAmountMismatch(
-        tx: PaymentTransaction, ledger: SettlementLedger, targetDate: LocalDate
-    ): Boolean {
-        val comparableLedgerAmount = kotlin.math.abs(ledger.amount)
-        val reason = if (tx.type == PaymentTxType.CANCEL) {
-            "정산 원장의 금액이 일치하지 않음 (거래금액=${tx.requestedAmount}, 원장금액(절댓값)=$comparableLedgerAmount)"
-        } else {
-            "정산 원장의 금액이 일치하지 않음 (거래금액=${tx.requestedAmount}, 원장금액=$comparableLedgerAmount)"
-        }
-        return reconciliationWriter.writeMismatch(tx, targetDate, MismatchType.AMOUNT_MISMATCH, reason)
-    }
-
     @Transactional
     fun resolveOpenMismatches() {
         val autoResolvableTypes = listOf(
+            MismatchType.MISSING_RAW_DATA,
             MismatchType.MISSING_LEDGER,
             MismatchType.DUPLICATED_LEDGER,
             MismatchType.TYPE_MISMATCH,
@@ -131,7 +145,10 @@ class InternalReconciliationService(
 
         val openTransactionIds = openResults.map { it.transactionId }.distinct()
         val transactionById = paymentTransactionRepository.findAllByIdIn(openTransactionIds).associateBy { it.id }
-        val ledgersByTransactionId = ledgerRepository.findAllByTransactionIdIn(openTransactionIds).groupBy { it.transactionId }
+        val ledgersByTransactionId =
+            ledgerRepository.findAllByTransactionIdIn(openTransactionIds).groupBy { it.transactionId }
+        val rawDataByTransactionId =
+            rawDataRepository.findAllByTransactionIdIn(openTransactionIds).groupBy { it.transactionId }
 
         var resolvedCount = 0
         openResults.forEach { result ->
@@ -144,16 +161,68 @@ class InternalReconciliationService(
             val expectedType = tx.type.toLedgerType()
             val sameTypeLedgers = ledgers.filter { it.ledgerType == expectedType }
 
-            if (sameTypeLedgers.size == 1) {
-                if (reconciliationWriter.resolveIfOpen(
-                        result.transactionId, result.mismatchType, sameTypeLedgers.first().id, "재검사 과정에서 정상이 확인되어 해결됨"
-                    )
-                ) {
-                    resolvedCount++
-                }
+            val resolved = when (result.mismatchType) {
+                MismatchType.MISSING_RAW_DATA  -> resolveMissingRawData(result, sameTypeLedgers, rawDataByTransactionId)
+                MismatchType.MISSING_LEDGER    -> resolveMissingLedger(result, sameTypeLedgers)
+                MismatchType.DUPLICATED_LEDGER -> resolveDuplicatedLedger(result, sameTypeLedgers)
+                MismatchType.TYPE_MISMATCH     -> resolveTypeMismatch(result, ledgers, sameTypeLedgers, expectedType)
+                else -> { log.warn("[내부대사-재검사] 처리되지 않은 mismatchType. type={}, tx_id={}", result.mismatchType, result.transactionId); false }
             }
+            if (resolved) resolvedCount++
         }
 
         log.info("[내부대사-재검사] 종료. 자동 해결 건수: {}", resolvedCount)
+    }
+
+    private fun resolveMissingRawData(
+        result: InternalReconciliationResult,
+        sameTypeLedgers: List<SettlementLedger>,
+        rawDataByTransactionId: Map<Long, List<SettlementRawData>>
+    ): Boolean {
+        val rawDataArrived = rawDataByTransactionId[result.transactionId]?.isNotEmpty() == true
+        return when {
+            // RawData + 원장 모두 도착 → RESOLVED
+            rawDataArrived && sameTypeLedgers.size == 1 ->
+                reconciliationWriter.resolveIfOpen(result.transactionId, result.mismatchType, sameTypeLedgers.first().id, "RawData 및 원장 생성 확인되어 해결됨")
+
+            // RawData만 도착, 원장 미생성 → MISSING_LEDGER로 전환
+            rawDataArrived -> {
+                reconciliationWriter.transitionMismatchType(result, MismatchType.MISSING_LEDGER, "RawData 수신 확인됨. 원장 미생성 상태로 전환 (워커 처리 실패 가능성)")
+                false
+            }
+
+            // RawData 아직 없음 → 유지
+            else -> {
+                log.debug("[내부대사-재검사] MISSING_RAW_DATA 유지. tx_id={}", result.transactionId)
+                false
+            }
+        }
+    }
+
+    private fun resolveMissingLedger(
+        result: InternalReconciliationResult,
+        sameTypeLedgers: List<SettlementLedger>
+    ): Boolean {
+        if (sameTypeLedgers.size != 1) return false
+        return reconciliationWriter.resolveIfOpen(result.transactionId, result.mismatchType, sameTypeLedgers.first().id, "재검사 과정에서 정상이 확인되어 해결됨")
+    }
+
+    private fun resolveDuplicatedLedger(
+        result: InternalReconciliationResult,
+        sameTypeLedgers: List<SettlementLedger>
+    ): Boolean {
+        if (sameTypeLedgers.size != 1) return false
+        return reconciliationWriter.resolveIfOpen(result.transactionId, result.mismatchType, sameTypeLedgers.first().id, "재검사 과정에서 정상이 확인되어 해결됨")
+    }
+
+    private fun resolveTypeMismatch(
+        result: InternalReconciliationResult,
+        ledgers: List<SettlementLedger>,
+        sameTypeLedgers: List<SettlementLedger>,
+        expectedType: TransactionType
+    ): Boolean {
+        val wrongTypeLedgers = ledgers.filter { it.ledgerType != expectedType }
+        if (sameTypeLedgers.size != 1 || wrongTypeLedgers.isNotEmpty()) return false
+        return reconciliationWriter.resolveIfOpen(result.transactionId, result.mismatchType, sameTypeLedgers.first().id, "재검사 과정에서 정상이 확인되어 해결됨")
     }
 }

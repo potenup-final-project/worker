@@ -11,6 +11,7 @@ interface SettlementRawDataRepository {
     fun findByPaymentKeyAndTransactionType(paymentKey: String, type: TransactionType): SettlementRawData?
     fun findById(id: Long): SettlementRawData?
     fun findByTransactionId(transactionId: Long): SettlementRawData?
+    fun findAllByTransactionIdIn(transactionIds: List<Long>): List<SettlementRawData>
     fun findRetryableDataForClaim(statuses: List<RawDataStatus>, now: LocalDateTime, limit: Int): List<SettlementRawData>
     fun findStuckProcessingDataForClaim(threshold: LocalDateTime, limit: Int): List<SettlementRawData>
 }
