@@ -25,6 +25,7 @@ class WebhookHttpClient(
 
     private val httpClient: HttpClient = HttpClient.newBuilder()
         .connectTimeout(Duration.ofMillis(connectTimeoutMs))
+        .followRedirects(HttpClient.Redirect.NEVER)
         .build()
 
     companion object {
