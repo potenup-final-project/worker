@@ -7,7 +7,15 @@ import java.util.UUID
 
 interface WebhookDeliveryStateRepository {
     fun claimDueBatch(batchSize: Int): List<ClaimedDelivery>
-    fun bulkInsertIgnore(eventId: UUID, merchantId: Long, endpointIds: List<Long>, payloadSnapshot: String)
+    fun bulkInsertIgnore(
+        eventId: UUID,
+        messageId: String,
+        traceId: String?,
+        eventType: String,
+        merchantId: Long,
+        endpointIds: List<Long>,
+        payloadSnapshot: String,
+    )
     fun markSuccessNewTransaction(deliveryId: Long, httpStatus: Int, responseMs: Long)
     fun markFailedNewTransaction(deliveryId: Long, httpStatus: Int?, errorCode: String, nextAt: LocalDateTime)
     fun markDeadNewTransaction(deliveryId: Long, httpStatus: Int?, errorCode: String)

@@ -49,6 +49,9 @@ class SendWebhookServiceTest {
         val delivery = ClaimedDelivery(
             deliveryId = 1L,
             endpointId = 101L,
+            messageId = "msg-1",
+            traceId = "trace-1",
+            eventType = "CHECKOUT_CONFIRMED",
             eventId = UUID.randomUUID(),
             merchantId = 9L,
             payloadSnapshot = "{}",
@@ -74,6 +77,7 @@ class SendWebhookServiceTest {
 
         assertEquals(1, outcomes.captured.size)
         assertEquals(WebhookDeliveryStatus.SUCCESS, outcomes.captured[0].status)
+        verify(exactly = 1) { metrics.recordDeliveryOutcome(WebhookDeliveryStatus.SUCCESS, 101L, null, "CHECKOUT_CONFIRMED") }
         verify(exactly = 1) { metrics.recordDeliverySuccess() }
         verify(exactly = 0) { metrics.recordDeliveryRetry() }
         verify(exactly = 0) { metrics.recordDeliveryDead() }
@@ -84,6 +88,9 @@ class SendWebhookServiceTest {
         val delivery = ClaimedDelivery(
             deliveryId = 2L,
             endpointId = 102L,
+            messageId = "msg-2",
+            traceId = "trace-2",
+            eventType = "CHECKOUT_CONFIRMED",
             eventId = UUID.randomUUID(),
             merchantId = 9L,
             payloadSnapshot = "{}",
@@ -110,6 +117,9 @@ class SendWebhookServiceTest {
         val outcome = outcomes.captured.single()
         assertEquals(WebhookDeliveryStatus.FAILED, outcome.status)
         assertNotNull(outcome.nextAttemptAt)
+        verify(exactly = 1) {
+            metrics.recordDeliveryOutcome(WebhookDeliveryStatus.FAILED, 102L, "HTTP_500:SERVER_ERROR", "CHECKOUT_CONFIRMED")
+        }
         verify(exactly = 1) { metrics.recordDeliveryRetry() }
     }
 
@@ -118,6 +128,9 @@ class SendWebhookServiceTest {
         val delivery = ClaimedDelivery(
             deliveryId = 3L,
             endpointId = 999L,
+            messageId = "msg-3",
+            traceId = "trace-3",
+            eventType = "CHECKOUT_CONFIRMED",
             eventId = UUID.randomUUID(),
             merchantId = 9L,
             payloadSnapshot = "{}",
@@ -135,6 +148,14 @@ class SendWebhookServiceTest {
         service().sendBatch(10)
 
         assertEquals(WebhookDeliveryStatus.DEAD, outcomes.captured.single().status)
+        verify(exactly = 1) {
+            metrics.recordDeliveryOutcome(
+                WebhookDeliveryStatus.DEAD,
+                999L,
+                "ENDPOINT_NOT_FOUND:endpoint removed",
+                "CHECKOUT_CONFIRMED",
+            )
+        }
         verify(exactly = 1) { metrics.recordDeliveryDead() }
     }
 
@@ -143,6 +164,9 @@ class SendWebhookServiceTest {
         val delivery = ClaimedDelivery(
             deliveryId = 4L,
             endpointId = 103L,
+            messageId = "msg-4",
+            traceId = "trace-4",
+            eventType = "CHECKOUT_CONFIRMED",
             eventId = UUID.randomUUID(),
             merchantId = 9L,
             payloadSnapshot = "{}",

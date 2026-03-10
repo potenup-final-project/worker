@@ -16,12 +16,13 @@ import com.pg.worker.webhook.util.SecretEncryptor
 import com.pg.worker.webhook.util.WebhookMetrics
 import jakarta.annotation.PreDestroy
 import org.slf4j.LoggerFactory
+import org.slf4j.MDC
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import java.io.IOException
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 @Service
 class SendWebhookService(
@@ -61,7 +62,16 @@ class SendWebhookService(
         val outcomes = futures.mapNotNull { it.join() }
         deliveryStateRepository.applySendOutcomesNewTransaction(outcomes)
 
+        val claimedByDeliveryId = claimed.associateBy { it.deliveryId }
+
         outcomes.forEach { outcome ->
+            val claimedDelivery = claimedByDeliveryId[outcome.deliveryId]
+            metrics.recordDeliveryOutcome(
+                status = outcome.status,
+                endpointId = claimedDelivery?.endpointId ?: -1L,
+                reason = outcome.errorCode,
+                eventType = claimedDelivery?.eventType,
+            )
             when (outcome.status) {
                 WebhookDeliveryStatus.SUCCESS -> metrics.recordDeliverySuccess()
                 WebhookDeliveryStatus.FAILED -> metrics.recordDeliveryRetry()
@@ -83,6 +93,12 @@ class SendWebhookService(
         delivery: ClaimedDelivery,
         endpointMap: Map<EndpointKey, WebhookEndpoint>,
     ): DeliverySendOutcome? {
+        MDC.put("deliveryId", delivery.deliveryId.toString())
+        MDC.put("endpointId", delivery.endpointId.toString())
+        MDC.put("eventId", delivery.eventId.toString())
+        MDC.put("messageId", delivery.messageId)
+        delivery.traceId?.let { MDC.put("traceId", it) }
+
         if (!concurrencyLimiter.tryAcquire(delivery.endpointId)) {
             deliveryStateRepository.revertClaim(delivery.deliveryId)
             log.debug(
@@ -90,6 +106,7 @@ class SendWebhookService(
                 delivery.deliveryId,
                 delivery.endpointId,
             )
+            MDC.clear()
             return null
         }
 
@@ -99,6 +116,7 @@ class SendWebhookService(
             return sendAndClassify(delivery, endpoint)
         } finally {
             concurrencyLimiter.release(delivery.endpointId)
+            MDC.clear()
         }
     }
 
@@ -118,6 +136,8 @@ class SendWebhookService(
                 RetryClassifier.Outcome.RETRY -> retry(delivery, result.httpStatus, RetryClassifier.toErrorCode(result.httpStatus))
                 RetryClassifier.Outcome.DEAD -> dead(delivery, result.httpStatus, RetryClassifier.toErrorCode(result.httpStatus))
             }
+        } catch (e: IllegalArgumentException) {
+            dead(delivery, httpStatus = null, errorCode = "ENDPOINT_POLICY_BLOCKED:${e.message}")
         } catch (e: IOException) {
             retry(delivery, httpStatus = null, errorCode = RetryClassifier.toNetworkErrorCode(e))
         } catch (e: Exception) {

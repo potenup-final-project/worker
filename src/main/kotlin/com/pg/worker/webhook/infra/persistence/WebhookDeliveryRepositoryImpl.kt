@@ -66,6 +66,9 @@ class WebhookDeliveryRepositoryImpl(
             ClaimedDelivery(
                 deliveryId = it.deliveryId,
                 endpointId = it.endpointId,
+                messageId = it.messageId,
+                traceId = it.traceId,
+                eventType = it.eventType,
                 eventId = it.eventId,
                 merchantId = it.merchantId,
                 payloadSnapshot = it.payloadSnapshot,
@@ -77,21 +80,32 @@ class WebhookDeliveryRepositoryImpl(
     // INSERT IGNORE: 중복 (event_id, endpoint_id) 무시하는 멱등 insert (네이티브 쿼리)
     // REQUIRED: 외부 TX가 있으면 참여, 없으면 신규 TX 생성 (직접 호출·DeliveryCreationService 양쪽 지원)
     @Transactional(propagation = Propagation.REQUIRED)
-    override fun bulkInsertIgnore(eventId: UUID, merchantId: Long, endpointIds: List<Long>, payloadSnapshot: String) {
+    override fun bulkInsertIgnore(
+        eventId: UUID,
+        messageId: String,
+        traceId: String?,
+        eventType: String,
+        merchantId: Long,
+        endpointIds: List<Long>,
+        payloadSnapshot: String,
+    ) {
         if (endpointIds.isEmpty()) return
         endpointIds.chunked(BULK_INSERT_CHUNK_SIZE).forEach { chunk ->
             val valuesSql = chunk.indices.joinToString(",") { index ->
-                "(:eventId, :endpointId$index, :merchantId, 'READY', $INITIAL_ATTEMPT_NO, NOW(), :payload, NOW(), NOW())"
+                "(:eventId, :messageId, :traceId, :eventType, :endpointId$index, :merchantId, 'READY', $INITIAL_ATTEMPT_NO, NOW(), :payload, NOW(), NOW())"
             }
 
             val query = entityManager.createNativeQuery(
                 """
                 INSERT IGNORE INTO webhook_deliveries
-                    (event_id, endpoint_id, merchant_id, status, attempt_no, next_attempt_at, payload_snapshot, created_at, updated_at)
+                    (event_id, message_id, trace_id, event_type, endpoint_id, merchant_id, status, attempt_no, next_attempt_at, payload_snapshot, created_at, updated_at)
                 VALUES $valuesSql
                 """.trimIndent()
             )
                 .setParameter("eventId", eventId.toString())
+                .setParameter("messageId", messageId)
+                .setParameter("traceId", traceId)
+                .setParameter("eventType", eventType)
                 .setParameter("merchantId", merchantId)
                 .setParameter("payload", payloadSnapshot)
 

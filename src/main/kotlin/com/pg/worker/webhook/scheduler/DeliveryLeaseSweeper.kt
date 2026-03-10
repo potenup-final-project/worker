@@ -17,7 +17,7 @@ class DeliveryLeaseSweeper(
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
-    @Scheduled(fixedDelayString = "\${webhook.lease.sweep-interval-ms}")
+    @Scheduled(fixedDelayString = "\${webhook.lease.sweep-interval-ms}", scheduler = "webhookWorkerScheduler")
     fun sweep() {
         try {
             val recovered = deliveryRepository.recoverExpiredLeases(leaseMinutes)
@@ -26,6 +26,7 @@ class DeliveryLeaseSweeper(
                 metrics.incrementDeliveryLeaseRecovered(recovered)
             }
         } catch (e: Exception) {
+            metrics.recordLeaseSweepError()
             log.error("[DeliveryLeaseSweeper] sweep 실패", e)
         }
     }
