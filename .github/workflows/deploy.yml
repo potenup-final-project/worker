@@ -42,7 +42,7 @@ jobs:
             --env-file /home/ec2-user/app/pg-worker.env \
             -p 8080:8080 \
             --restart always \
-            potenup/pg-core:${{ needs.build.outputs.image_tag }}
+            potenup/pg-worker:${{ needs.build.outputs.image_tag }}
 
       - name: Verify container running
         run: |
