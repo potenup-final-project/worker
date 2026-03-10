@@ -4,6 +4,7 @@ import com.pg.worker.webhook.reconciliation.domain.WebhookMismatchType
 import com.pg.worker.webhook.reconciliation.domain.WebhookReconciliationResult
 import com.pg.worker.webhook.reconciliation.domain.WebhookReconciliationStatus
 import com.pg.worker.webhook.reconciliation.application.WebhookReconciliationProperties
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.jdbc.core.RowMapper
@@ -18,6 +19,7 @@ import java.util.UUID
 @Repository
 @ConditionalOnProperty(prefix = "webhook.recon", name = ["enabled"], havingValue = "true")
 class WebhookReconciliationResultStore(
+    @Qualifier("workerJdbcTemplate")
     private val jdbcTemplate: NamedParameterJdbcTemplate,
     private val properties: WebhookReconciliationProperties,
 ) {

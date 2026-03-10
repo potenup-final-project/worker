@@ -3,6 +3,7 @@ package com.pg.worker.webhook.reconciliation.infra
 import com.pg.worker.webhook.domain.WebhookDeliveryStatus
 import com.pg.worker.webhook.reconciliation.domain.EndpointStatsProjection
 import com.pg.worker.webhook.reconciliation.domain.StaleDeliveryProjection
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
 import org.springframework.stereotype.Repository
@@ -13,6 +14,7 @@ import java.util.UUID
 @Repository
 @ConditionalOnProperty(prefix = "webhook.recon", name = ["enabled"], havingValue = "true")
 class WebhookDeliveryReconciliationReader(
+    @Qualifier("workerJdbcTemplate")
     private val jdbcTemplate: NamedParameterJdbcTemplate,
 ) {
     fun findStaleFailedDeliveries(
