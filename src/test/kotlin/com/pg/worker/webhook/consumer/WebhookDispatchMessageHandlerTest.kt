@@ -68,7 +68,7 @@ class WebhookDispatchMessageHandlerTest {
     @Test
     fun `지원하지 않는 schemaVersion 메시지는 건너뛴다`() {
         val message = WebhookDispatchMessage(
-            schemaVersion = 2,
+            schemaVersion = WebhookDispatchMessage.CURRENT_SCHEMA_VERSION + 1,
             eventId = UUID.randomUUID(),
             merchantId = 9L,
             payload = "{}",
