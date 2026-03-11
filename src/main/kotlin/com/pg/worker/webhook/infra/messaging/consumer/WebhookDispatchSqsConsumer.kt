@@ -1,4 +1,4 @@
-package com.pg.worker.webhook.consumer
+package com.pg.worker.webhook.infra.messaging.consumer
 
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value

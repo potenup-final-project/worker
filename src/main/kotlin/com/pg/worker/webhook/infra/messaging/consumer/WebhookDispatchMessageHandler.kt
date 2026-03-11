@@ -1,9 +1,9 @@
-package com.pg.worker.webhook.consumer
+package com.pg.worker.webhook.infra.messaging.consumer
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.pg.worker.webhook.application.usecase.repository.WebhookDeliveryStateRepository
 import com.pg.worker.webhook.application.usecase.repository.WebhookEndpointReadRepository
-import com.pg.worker.webhook.consumer.dto.WebhookDispatchMessage
+import com.pg.worker.webhook.infra.messaging.consumer.dto.WebhookDispatchMessage
 import org.slf4j.LoggerFactory
 import org.slf4j.MDC
 import org.springframework.stereotype.Component
