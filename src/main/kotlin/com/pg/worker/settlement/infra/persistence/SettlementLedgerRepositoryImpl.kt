@@ -65,4 +65,8 @@ class SettlementLedgerRepositoryImpl(
     override fun findAllByTransactionIdIn(transactionIds: List<Long>): List<SettlementLedger> {
         return jpaRepository.findAllByTransactionIdIn(transactionIds)
     }
+
+    override fun findAllBySettlementBaseDate(baseDate: LocalDate): List<SettlementLedger> {
+        return jpaRepository.findAllBySettlementBaseDate(baseDate)
+    }
 }

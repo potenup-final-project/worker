@@ -12,4 +12,5 @@ interface SettlementRawDataJpaRepository : JpaRepository<SettlementRawData, Long
     fun findAllByTransactionIdIn(transactionIds: List<Long>): List<SettlementRawData>
     fun findAllByEventOccurredAtBetween(from: LocalDateTime, to: LocalDateTime): List<SettlementRawData>
     fun findAllByProviderTxIdIn(providerTxIds: List<String>): List<SettlementRawData>
+    fun findAllByEventIdIn(eventIds: List<String>): List<SettlementRawData>
 }

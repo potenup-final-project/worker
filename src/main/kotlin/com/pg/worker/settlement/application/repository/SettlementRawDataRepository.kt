@@ -19,5 +19,5 @@ interface SettlementRawDataRepository {
     ): List<SettlementRawData>
 
     fun findStuckProcessingDataForClaim(threshold: LocalDateTime, limit: Int): List<SettlementRawData>
-    fun findAllByEventOccurredAtBetween(from: LocalDateTime, to: LocalDateTime): List<SettlementRawData>
+    fun findAllByEventIdIn(eventIds: List<String>): List<SettlementRawData>
 }

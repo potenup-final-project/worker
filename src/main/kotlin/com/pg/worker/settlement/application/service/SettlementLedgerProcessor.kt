@@ -19,6 +19,7 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
+import java.math.BigDecimal
 import java.math.RoundingMode
 
 @Component
@@ -28,6 +29,9 @@ class SettlementLedgerProcessor(
     private val policyRepository: SettlementPolicyRepository
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
+
+    // 카드사 원가 수수료율 고정 (테스트용 2.1%)
+    private val HOST_FEE_RATE = BigDecimal("0.021")
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     fun process(rawId: Long) {
@@ -98,15 +102,17 @@ class SettlementLedgerProcessor(
     }
 
     private fun buildApproveLedger(raw: SettlementRawData, policy: SettlementPolicy): SettlementLedger {
-        val fee = calculateFee(raw.amount, policy.feeRate)
-        val settlementAmount = raw.amount - fee
+        val hostFee = calculateFee(raw.amount, HOST_FEE_RATE)
+        val totalFee = calculateFee(raw.amount, policy.feeRate)
+        val serviceFee = totalFee - hostFee // PG 마진 수수료
+        
         val settlementBaseDate = raw.eventOccurredAt.plusDays(policy.settlementCycleDays.toLong()).toLocalDate()
 
         return SettlementLedger.create(
             raw = raw,
             originalPaymentTxId = null,
-            fee = fee,
-            settlementAmount = settlementAmount,
+            hostFee = hostFee,
+            serviceFee = serviceFee,
             settlementBaseDate = settlementBaseDate,
             policy = policy
         )
@@ -161,8 +167,10 @@ class SettlementLedgerProcessor(
         originalApproveRaw: SettlementRawData,
         originalLedger: SettlementLedger
     ): SettlementLedger {
-        val cancelFee = calculateFee(raw.amount, originalLedger.policyFeeRate)
-        val cancelSettlementAmount = raw.amount - cancelFee
+        val hostFee = calculateFee(raw.amount, HOST_FEE_RATE)
+        val totalFee = calculateFee(raw.amount, originalLedger.policyFeeRate)
+        val serviceFee = totalFee - hostFee
+
         val cancelSettlementBaseDate = raw.eventOccurredAt
             .plusDays(originalLedger.policySettlementCycleDays.toLong())
             .toLocalDate()
@@ -170,8 +178,8 @@ class SettlementLedgerProcessor(
         return SettlementLedger.create(
             raw = raw,
             originalPaymentTxId = originalApproveRaw.transactionId,
-            fee = cancelFee,
-            settlementAmount = cancelSettlementAmount,
+            hostFee = hostFee,
+            serviceFee = serviceFee,
             settlementBaseDate = cancelSettlementBaseDate,
             settlementPolicyId = originalLedger.settlementPolicyId,
             policyFeeRate = originalLedger.policyFeeRate,
@@ -179,7 +187,7 @@ class SettlementLedgerProcessor(
         )
     }
 
-    private fun calculateFee(amount: Long, feeRate: java.math.BigDecimal): Long {
+    private fun calculateFee(amount: Long, feeRate: BigDecimal): Long {
         return (amount.toBigDecimal() * feeRate)
             .setScale(0, RoundingMode.HALF_UP).toLong()
     }

@@ -74,8 +74,8 @@ class SettlementRawDataRepositoryImpl(
             .fetch()
     }
 
-    override fun findAllByEventOccurredAtBetween(from: LocalDateTime, to: LocalDateTime): List<SettlementRawData> {
-        return jpaRepository.findAllByEventOccurredAtBetween(from, to)
+    override fun findAllByEventIdIn(eventIds: List<String>): List<SettlementRawData> {
+        return jpaRepository.findAllByEventIdIn(eventIds)
     }
 
     companion object {
