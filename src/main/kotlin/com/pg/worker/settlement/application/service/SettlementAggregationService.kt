@@ -49,7 +49,7 @@ class SettlementAggregationService(
                 TransactionType.CANCEL -> totalCancel += kotlin.math.abs(ledger.amount)
                 else -> {}
             }
-            totalFee += ledger.fee
+            totalFee += ledger.totalFee
         }
 
         // 4. 집계 결과 저장

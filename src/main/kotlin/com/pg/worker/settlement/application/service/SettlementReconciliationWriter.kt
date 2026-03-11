@@ -1,9 +1,8 @@
 package com.pg.worker.settlement.application.service
 
 import com.pg.worker.settlement.application.repository.SettlementReconciliationResultRepository
-import com.pg.worker.settlement.domain.ExternalTransactionRecord
+import com.pg.worker.settlement.domain.ExternalSettlementDetail
 import com.pg.worker.settlement.domain.ReconciliationStatus
-import com.pg.worker.settlement.domain.SettlementRawData
 import com.pg.worker.settlement.domain.SettlementReconciliationResult
 import com.pg.worker.settlement.domain.SettlementReconciliationResultType
 import org.slf4j.LoggerFactory
@@ -19,15 +18,16 @@ class SettlementReconciliationWriter(
 
     /**
      * MATCHED 결과 저장.
-     * 이미 해당 날짜에 동일 providerTxId 결과가 존재하면 skip.
-     * 기존 OPEN 결과가 있었다면 RESOLVED로 전환.
      */
     fun writeMatched(
         reconciliationDate: LocalDate,
-        rawData: SettlementRawData,
-        externalRecord: ExternalTransactionRecord,
+        rawDataId: Long?,
+        merchantId: Long,
+        providerTxId: String,
+        externalRecord: ExternalSettlementDetail,
+        internalAmount: Long,
     ): Boolean {
-        val existing = repository.findByProviderTxIdAndReconciliationDate(rawData.providerTxId, reconciliationDate)
+        val existing = repository.findByProviderTxIdAndReconciliationDate(providerTxId, reconciliationDate)
 
         if (existing != null && existing.resultType == SettlementReconciliationResultType.MATCHED) {
             return false
@@ -39,7 +39,7 @@ class SettlementReconciliationWriter(
             repository.save(existing)
             log.info(
                 "[외부대사] 기존 OPEN mismatch RESOLVED 전환. providerTxId={}, date={}",
-                rawData.providerTxId, reconciliationDate
+                providerTxId, reconciliationDate
             )
             return true
         }
@@ -47,19 +47,18 @@ class SettlementReconciliationWriter(
         return trySave(
             SettlementReconciliationResult.matched(
                 reconciliationDate = reconciliationDate,
-                merchantId = rawData.merchantId,
-                providerTxId = rawData.providerTxId,
-                internalRawDataId = rawData.id,
+                merchantId = merchantId,
+                providerTxId = providerTxId,
+                internalRawDataId = rawDataId,
                 externalRecordId = externalRecord.id,
-                internalAmount = rawData.amount,
+                internalAmount = internalAmount,
                 externalAmount = externalRecord.amount,
             )
         )
     }
 
     /**
-     * mismatch 결과 저장 (MATCHED 외 모든 resultType).
-     * 동일 (providerTxId, reconciliationDate) 조합이 이미 OPEN 상태이면 중복 저장 skip.
+     * mismatch 결과 저장.
      */
     fun writeMismatch(
         reconciliationDate: LocalDate,
@@ -72,8 +71,13 @@ class SettlementReconciliationWriter(
         externalAmount: Long? = null,
         reason: String,
     ): Boolean {
-        if (repository.existsByProviderTxIdAndReconciliationDate(providerTxId, reconciliationDate)) {
-            return false
+        val existing = repository.findByProviderTxIdAndReconciliationDate(providerTxId, reconciliationDate)
+        if (existing != null) {
+            // 이미 동일한 타입으로 OPEN 상태이면 중복 저장 skip
+            if (existing.resultType == resultType && existing.status == ReconciliationStatus.OPEN) {
+                return false
+            }
+            // 타입이 달라졌거나 상태가 달면 업데이트 (실제론 비즈니스 정책에 따라 다름. 여기선 단순화)
         }
 
         return trySave(

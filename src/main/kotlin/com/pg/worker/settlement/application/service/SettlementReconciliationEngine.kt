@@ -1,19 +1,20 @@
 package com.pg.worker.settlement.application.service
 
-import com.pg.worker.settlement.application.repository.ExternalTransactionRecordRepository
+import com.pg.worker.settlement.application.repository.ExternalSettlementDetailRepository
+import com.pg.worker.settlement.application.repository.SettlementLedgerRepository
 import com.pg.worker.settlement.application.repository.SettlementRawDataRepository
-import com.pg.worker.settlement.domain.ExternalTransactionRecord
-import com.pg.worker.settlement.domain.SettlementRawData
+import com.pg.worker.settlement.domain.ExternalSettlementDetail
+import com.pg.worker.settlement.domain.SettlementLedger
 import com.pg.worker.settlement.domain.SettlementReconciliationResultType
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
-import java.time.LocalTime
 
 @Service
 class SettlementReconciliationEngine(
-    private val externalRecordRepository: ExternalTransactionRecordRepository,
+    private val externalDetailRepository: ExternalSettlementDetailRepository,
+    private val ledgerRepository: SettlementLedgerRepository,
     private val rawDataRepository: SettlementRawDataRepository,
     private val writer: SettlementReconciliationWriter,
 ) {
@@ -22,6 +23,7 @@ class SettlementReconciliationEngine(
     private data class ReconciliationStats(
         var matched: Int = 0,
         var amountMismatch: Int = 0,
+        var feeMismatch: Int = 0,
         var partiallyMatched: Int = 0,
         var missingInternal: Int = 0,
         var missingExternal: Int = 0,
@@ -29,51 +31,52 @@ class SettlementReconciliationEngine(
         var duplicatedExternal: Int = 0,
     ) {
         fun toSummaryLog(): String =
-            "MATCHED=$matched, AMOUNT_MISMATCH=$amountMismatch, PARTIALLY_MATCHED=$partiallyMatched, " +
-                    "MISSING_INTERNAL=$missingInternal, MISSING_EXTERNAL=$missingExternal, " +
-                    "DUPLICATED_INTERNAL=$duplicatedInternal, DUPLICATED_EXTERNAL=$duplicatedExternal"
+            "MATCHED=$matched, AMOUNT_MISMATCH=$amountMismatch, FEE_MISMATCH=$feeMismatch, " +
+                    "PARTIALLY_MATCHED=$partiallyMatched, MISSING_INTERNAL=$missingInternal, " +
+                    "MISSING_EXTERNAL=$missingExternal, DUPLICATED_INTERNAL=$duplicatedInternal, " +
+                    "DUPLICATED_EXTERNAL=$duplicatedExternal"
     }
 
     @Transactional
     fun reconcile(baseDate: LocalDate) {
-        log.info("[외부대사] 시작. 기준일={}", baseDate)
+        log.info("[외부대사] 시작. 정산기준일={}", baseDate)
 
-        val externalMap = loadExternalRecordsByProviderTxId(baseDate)
-        val internalMap = loadInternalRawDataByProviderTxId(baseDate)
-        val stats = compareAndClassify(baseDate, externalMap, internalMap)
+        // 1. 외부 데이터 로드 (기준일 기준)
+        val externalMap = externalDetailRepository.findAllBySettlementBaseDate(baseDate).groupBy { it.providerTxId }
+        log.info("[외부대사] 외부 정산 내역 로드 완료. 건수={}", externalMap.values.sumOf { it.size })
 
-        log.info("[외부대사] 종료. {}", stats.toSummaryLog())
-    }
+        // 2. 내부 원장 데이터 로드 (기준일 기준)
+        val ledgers = ledgerRepository.findAllBySettlementBaseDate(baseDate)
+        
+        // 3. providerTxId 매칭을 위해 RawData 정보 Join (메모리상)
+        val rawEventIds = ledgers.map { it.rawEventId }
+        val rawDataMap = rawDataRepository.findAllByEventIdIn(rawEventIds).associateBy { it.eventId }
+        
+        val internalMap = ledgers.groupBy { ledger ->
+            rawDataMap[ledger.rawEventId]?.providerTxId ?: "UNKNOWN_TX_${ledger.id}"
+        }
+        log.info("[외부대사] 내부 정산 원장 로드 완료. 건수={}", ledgers.size)
 
-    private fun loadExternalRecordsByProviderTxId(baseDate: LocalDate): Map<String, List<ExternalTransactionRecord>> {
-        val from = baseDate.atStartOfDay()
-        val to = baseDate.atTime(LocalTime.MAX)
-        val records = externalRecordRepository.findAllByOccurredAtBetween(from, to)
-        log.info("[외부대사] 외부 거래 내역 로드 완료. 건수={}", records.size)
-        return records.groupBy { it.providerTxId }
-    }
+        // 4. 비교 및 분류
+        val stats = compareAndClassify(baseDate, externalMap, internalMap, rawDataMap)
 
-    private fun loadInternalRawDataByProviderTxId(baseDate: LocalDate): Map<String, List<SettlementRawData>> {
-        val from = baseDate.atStartOfDay()
-        val to = baseDate.atTime(LocalTime.MAX)
-        val rawData = rawDataRepository.findAllByEventOccurredAtBetween(from, to)
-        log.info("[외부대사] 내부 RawData 로드 완료. 건수={}", rawData.size)
-        return rawData.groupBy { it.providerTxId }
+        log.info("[외부대사] 종료. 정산기준일={}, {}", baseDate, stats.toSummaryLog())
     }
 
     private fun compareAndClassify(
         baseDate: LocalDate,
-        externalMap: Map<String, List<ExternalTransactionRecord>>,
-        internalMap: Map<String, List<SettlementRawData>>,
+        externalMap: Map<String, List<ExternalSettlementDetail>>,
+        internalMap: Map<String, List<SettlementLedger>>,
+        rawDataMap: Map<String, com.pg.worker.settlement.domain.SettlementRawData>
     ): ReconciliationStats {
-        val allKeys = (externalMap.keys + internalMap.keys).sorted()
+        val allKeys = (externalMap.keys + internalMap.keys).distinct().sorted()
         log.info("[외부대사] 대사 대상 고유 providerTxId 건수={}", allKeys.size)
 
         val stats = ReconciliationStats()
         allKeys.forEach { providerTxId ->
             val externals = externalMap[providerTxId] ?: emptyList()
             val internals = internalMap[providerTxId] ?: emptyList()
-            classifyReconciliationResult(baseDate, providerTxId, externals, internals, stats)
+            classifyReconciliationResult(baseDate, providerTxId, externals, internals, stats, rawDataMap)
         }
         return stats
     }
@@ -81,9 +84,10 @@ class SettlementReconciliationEngine(
     private fun classifyReconciliationResult(
         baseDate: LocalDate,
         providerTxId: String,
-        externals: List<ExternalTransactionRecord>,
-        internals: List<SettlementRawData>,
+        externals: List<ExternalSettlementDetail>,
+        internals: List<SettlementLedger>,
         stats: ReconciliationStats,
+        rawDataMap: Map<String, com.pg.worker.settlement.domain.SettlementRawData>
     ) {
         when {
             externals.size > 1 -> {
@@ -100,27 +104,29 @@ class SettlementReconciliationEngine(
             }
 
             internals.size > 1 -> {
+                val firstLedger = internals.first()
                 writer.writeMismatch(
                     reconciliationDate = baseDate,
                     providerTxId = providerTxId,
                     resultType = SettlementReconciliationResultType.DUPLICATED_INTERNAL,
-                    merchantId = internals.first().merchantId,
-                    internalRawDataId = internals.first().id,
-                    internalAmount = internals.first().amount,
-                    reason = "동일 providerTxId로 내부 RawData가 ${internals.size}건 존재함",
+                    merchantId = firstLedger.merchantId,
+                    internalRawDataId = rawDataMap[firstLedger.rawEventId]?.id,
+                    internalAmount = internals.sumOf { it.amount },
+                    reason = "동일 providerTxId로 내부 정산 원장이 ${internals.size}건 존재함",
                 )
                 stats.duplicatedInternal++
             }
 
             internals.isEmpty() && externals.isNotEmpty() -> {
+                val external = externals.first()
                 writer.writeMismatch(
                     reconciliationDate = baseDate,
                     providerTxId = providerTxId,
                     resultType = SettlementReconciliationResultType.MISSING_INTERNAL,
-                    merchantId = externals.first().merchantId,
-                    externalRecordId = externals.first().id,
-                    externalAmount = externals.first().amount,
-                    reason = "외부 정산 파일에 존재하나 내부 RawData 없음 (이벤트 미수신 가능성)",
+                    merchantId = external.merchantId,
+                    externalRecordId = external.id,
+                    externalAmount = external.amount,
+                    reason = "외부 정산 파일에는 존재하나 내부 원장(Ledger) 없음 (결제 누락 또는 처리 지연)",
                 )
                 stats.missingInternal++
             }
@@ -132,9 +138,9 @@ class SettlementReconciliationEngine(
                     providerTxId = providerTxId,
                     resultType = SettlementReconciliationResultType.MISSING_EXTERNAL,
                     merchantId = internal.merchantId,
-                    internalRawDataId = internal.id,
+                    internalRawDataId = rawDataMap[internal.rawEventId]?.id,
                     internalAmount = internal.amount,
-                    reason = "내부 RawData는 존재하나 외부 정산 파일에 없음",
+                    reason = "내부 원장은 존재하나 외부 정산 파일에 없음 (매입 누락 가능성)",
                 )
                 stats.missingExternal++
             }
@@ -142,7 +148,8 @@ class SettlementReconciliationEngine(
             else -> {
                 val internal = internals.first()
                 val external = externals.first()
-                classifyByFieldComparison(baseDate, providerTxId, internal, external, stats)
+                val rawData = rawDataMap[internal.rawEventId]
+                classifyByFieldComparison(baseDate, providerTxId, internal, rawData, external, stats)
             }
         }
     }
@@ -150,35 +157,57 @@ class SettlementReconciliationEngine(
     private fun classifyByFieldComparison(
         baseDate: LocalDate,
         providerTxId: String,
-        internal: SettlementRawData,
-        external: ExternalTransactionRecord,
+        internal: SettlementLedger,
+        rawData: com.pg.worker.settlement.domain.SettlementRawData?,
+        external: ExternalSettlementDetail,
         stats: ReconciliationStats,
     ) {
-        val amountMatched = internal.amount == external.amount
-        val typeMatched = internal.transactionType == external.transactionType
+        val internalAbsAmount = kotlin.math.abs(internal.amount)
+        val internalAbsHostFee = kotlin.math.abs(internal.hostFee)
+        
+        val amountMatched = internalAbsAmount == external.amount
+        val feeMatched = internalAbsHostFee == external.fee
+        val typeMatched = internal.ledgerType == external.transactionType
 
         when {
-            amountMatched && typeMatched -> {
+            amountMatched && feeMatched && typeMatched -> {
                 writer.writeMatched(
                     reconciliationDate = baseDate,
-                    rawData = internal,
+                    rawDataId = rawData?.id,
+                    merchantId = internal.merchantId,
+                    providerTxId = providerTxId,
                     externalRecord = external,
+                    internalAmount = internal.amount
                 )
                 stats.matched++
             }
 
-            amountMatched && !typeMatched -> {
+            amountMatched && !feeMatched -> {
+                writer.writeMismatch(
+                    reconciliationDate = baseDate,
+                    providerTxId = providerTxId,
+                    resultType = SettlementReconciliationResultType.FEE_MISMATCH,
+                    merchantId = internal.merchantId,
+                    internalRawDataId = rawData?.id,
+                    externalRecordId = external.id,
+                    internalAmount = internal.amount,
+                    externalAmount = external.amount,
+                    reason = "원금은 일치하나 카드사 수수료 불일치 (내부원가=${internalAbsHostFee}, 외부=${external.fee})",
+                )
+                stats.feeMismatch++
+            }
+
+            amountMatched -> {
                 writer.writeMismatch(
                     reconciliationDate = baseDate,
                     providerTxId = providerTxId,
                     resultType = SettlementReconciliationResultType.PARTIALLY_MATCHED,
                     merchantId = internal.merchantId,
-                    internalRawDataId = internal.id,
+                    internalRawDataId = rawData?.id,
                     externalRecordId = external.id,
                     internalAmount = internal.amount,
                     externalAmount = external.amount,
-                    reason = "원금 일치, transactionType 불일치 " +
-                            "(내부=${internal.transactionType}, 외부=${external.transactionType})",
+                    reason = "원금 일치, transactionType 불일치 (내부=${internal.ledgerType}, 외부=${external.transactionType})",
                 )
                 stats.partiallyMatched++
             }
@@ -189,11 +218,11 @@ class SettlementReconciliationEngine(
                     providerTxId = providerTxId,
                     resultType = SettlementReconciliationResultType.AMOUNT_MISMATCH,
                     merchantId = internal.merchantId,
-                    internalRawDataId = internal.id,
+                    internalRawDataId = rawData?.id,
                     externalRecordId = external.id,
                     internalAmount = internal.amount,
                     externalAmount = external.amount,
-                    reason = "원금 불일치 (내부=${internal.amount}, 외부=${external.amount}, 차이=${external.amount - internal.amount})",
+                    reason = "원금 불일치 (내부절대값=${internalAbsAmount}, 외부=${external.amount})",
                 )
                 stats.amountMismatch++
             }

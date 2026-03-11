@@ -22,9 +22,6 @@ enum class SettlementReconciliationResultType {
     /** 외부 중복: 동일 providerTxId로 외부 Record 2건 이상 */
     DUPLICATED_EXTERNAL,
 
-    /**
-     * 취소 반영 지연: 내부에는 취소 거래가 존재하나 외부 정산 파일에 아직 반영되지 않음.
-     * 발생일로부터 N일 이내인 경우 MISSING_EXTERNAL이 아닌 일시적 지연으로 분류.
-     */
-    CANCEL_REFLECTION_DELAY,
+    /** 수수료 불일치: 카드사 수수료와 내부 계산 수수료가 다름 */
+    FEE_MISMATCH
 }

@@ -95,7 +95,7 @@ class SettlementReconciliationResult protected constructor(
             reconciliationDate: LocalDate,
             merchantId: Long,
             providerTxId: String,
-            internalRawDataId: Long,
+            internalRawDataId: Long?,
             externalRecordId: Long,
             internalAmount: Long,
             externalAmount: Long,
