@@ -42,8 +42,8 @@ class InternalReconciliationResult(
     var settlementLedgerId: Long? = null,
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "mismatch_type", length = 50, nullable = false, updatable = false)
-    val mismatchType: MismatchType,
+    @Column(name = "mismatch_type", length = 50, nullable = false)
+    var mismatchType: MismatchType,
 
     @Column(name = "reason", length = 500)
     var reason: String? = null,
@@ -64,9 +64,16 @@ class InternalReconciliationResult(
         this.updatedAt = LocalDateTime.now()
         if (reason != null) this.reason = reason
     }
+
+    fun transitionTo(newType: MismatchType, reason: String) {
+        this.mismatchType = newType
+        this.reason = reason
+        this.updatedAt = LocalDateTime.now()
+    }
 }
 
 enum class MismatchType {
+    MISSING_RAW_DATA,
     MISSING_LEDGER,
     DUPLICATED_LEDGER,
     AMOUNT_MISMATCH,

@@ -38,6 +38,10 @@ class SettlementRawDataRepositoryImpl(
         return jpaRepository.findByTransactionId(transactionId)
     }
 
+    override fun findAllByTransactionIdIn(transactionIds: List<Long>): List<SettlementRawData> {
+        return jpaRepository.findAllByTransactionIdIn(transactionIds)
+    }
+
     override fun findRetryableDataForClaim(
         statuses: List<RawDataStatus>,
         now: LocalDateTime,
@@ -68,6 +72,10 @@ class SettlementRawDataRepositoryImpl(
             .setLockMode(LockModeType.PESSIMISTIC_WRITE)
             .setHint(JPA_LOCK_TIMEOUT_HINT, SKIP_LOCKED)
             .fetch()
+    }
+
+    override fun findAllByEventIdIn(eventIds: List<String>): List<SettlementRawData> {
+        return jpaRepository.findAllByEventIdIn(eventIds)
     }
 
     companion object {

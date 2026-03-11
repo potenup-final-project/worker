@@ -61,4 +61,14 @@ class InternalReconciliationWriter(
             true
         } ?: false
     }
+
+    /**
+     * OPEN 상태인 불일치 건의 mismatchType을 변경한다.
+     * MISSING_RAW_DATA → MISSING_LEDGER 단계 전환 시 사용.
+     */
+    fun transitionMismatchType(result: InternalReconciliationResult, newType: MismatchType, reason: String) {
+        result.transitionTo(newType, reason)
+        repository.save(result)
+        log.info("[내부대사] 불일치 유형 전환. tx_id: {}, {} → {}", result.transactionId, result.mismatchType, newType)
+    }
 }
