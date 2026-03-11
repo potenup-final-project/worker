@@ -1,8 +1,8 @@
 package com.pg.worker.settlement.application.service
 
-import com.pg.worker.settlement.application.repository.ExternalTransactionClient
-import com.pg.worker.settlement.application.repository.ExternalTransactionRecordRepository
-import com.pg.worker.settlement.domain.ExternalTransactionRecord
+import com.pg.worker.settlement.application.repository.ExternalSettlementClient
+import com.pg.worker.settlement.application.repository.ExternalSettlementDetailRepository
+import com.pg.worker.settlement.domain.ExternalSettlementDetail
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -13,8 +13,8 @@ import java.time.LocalDate
  */
 @Service
 class ExternalTransactionFetchService(
-    private val externalClient: ExternalTransactionClient,
-    private val externalRepository: ExternalTransactionRecordRepository
+    private val externalClient: ExternalSettlementClient,
+    private val externalRepository: ExternalSettlementDetailRepository
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -42,13 +42,16 @@ class ExternalTransactionFetchService(
         val newRecords = externalDtos
             .filterNot { externalRepository.existsByProviderTxId(it.providerTxId) }
             .map { dto ->
-                ExternalTransactionRecord.create(
+                ExternalSettlementDetail.create(
                     providerTxId = dto.providerTxId,
                     sourceSystem = dto.sourceSystem,
                     merchantId = dto.merchantId,
                     transactionType = dto.transactionType,
                     amount = dto.amount,
+                    fee = dto.fee,
+                    netAmount = dto.netAmount,
                     settlementBaseDate = baseDate,
+                    payoutDate = dto.payoutDate,
                     occurredAt = dto.occurredAt,
                     rawPayload = dto.rawPayload
                 )
