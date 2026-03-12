@@ -1,6 +1,7 @@
 package com.pg.worker.global.logging
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.pg.worker.global.logging.support.LogSanitizer
 import com.pg.worker.global.logging.context.WorkerExecutionResult
 import com.pg.worker.global.logging.context.WorkerMessageContext
 import com.pg.worker.global.logging.context.WorkerResult
@@ -100,7 +101,7 @@ class MessageLogExecutor(
         ).apply {
             if (error != null) {
                 put("errorType", error.javaClass.simpleName)
-                put("errorMessage", sanitizeErrorMessage(error.message))
+                put("errorMessage", LogSanitizer.sanitizeErrorMessage(error.message))
             }
         }
 
@@ -118,16 +119,6 @@ class MessageLogExecutor(
             WorkerResult.FAIL,
                 -> log.error(json, error)
         }
-    }
-
-    private fun sanitizeErrorMessage(message: String?): String? {
-        if (message == null) {
-            return null
-        }
-
-        return message
-            .replace(Regex("""\b\d{12,19}\b"""), "****")
-            .take(300)
     }
 
     private fun serialize(payload: Map<String, Any?>): String {
