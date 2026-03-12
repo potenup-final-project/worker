@@ -12,8 +12,8 @@ import com.pg.worker.global.logging.MDC_TOPIC
 import com.pg.worker.global.logging.MDC_TRACE_ID
 import com.pg.worker.global.logging.annotation.BusinessLog
 import com.pg.worker.global.logging.context.LogContextHolder
-import com.pg.worker.global.logging.aspect.support.ErrorClassifier
-import com.pg.worker.global.logging.aspect.support.LogSanitizer
+import com.pg.worker.global.logging.support.ErrorClassifier
+import com.pg.worker.global.logging.support.LogSanitizer
 import org.aspectj.lang.ProceedingJoinPoint
 import org.aspectj.lang.annotation.Around
 import org.aspectj.lang.annotation.Aspect

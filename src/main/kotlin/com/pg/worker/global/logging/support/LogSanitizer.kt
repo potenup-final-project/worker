@@ -1,4 +1,4 @@
-package com.pg.worker.global.logging.aspect.support
+package com.pg.worker.global.logging.support
 
 object LogSanitizer {
     fun sanitizeErrorMessage(message: String?): String? {
