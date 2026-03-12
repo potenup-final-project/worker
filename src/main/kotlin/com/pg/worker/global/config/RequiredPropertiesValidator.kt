@@ -12,6 +12,7 @@ class RequiredPropertiesValidator(
     @PostConstruct
     fun validate() {
         val required = listOf(
+            "DB_URL",
             "DB_USER",
             "DB_PASSWORD",
             "AWS_REGION",
@@ -47,6 +48,31 @@ class RequiredPropertiesValidator(
         val sqsEnabled = environment.getProperty("WEBHOOK_SQS_ENABLED")?.toBooleanStrictOrNull() == true
         if (sqsEnabled && environment.getProperty("WEBHOOK_SQS_QUEUE_URL").isNullOrBlank()) {
             throw IllegalStateException(CommonErrorCode.RELAY_SQS_QUEUE_URL_MISSING.message)
+        }
+
+        val reconciliationEnabled = environment.getProperty("WEBHOOK_RECON_ENABLED")?.toBooleanStrictOrNull() == true
+        if (reconciliationEnabled) {
+            val reconciliationRequired = listOf(
+                "WEBHOOK_RECON_CHUNK_SIZE",
+                "WEBHOOK_RECON_MAX_PAGES",
+                "WEBHOOK_RECON_STALE_GRACE_MINUTES",
+                "WEBHOOK_RECON_STALE_AGE_HOURS",
+                "WEBHOOK_RECON_DEGRADED_WINDOW_DAYS",
+                "WEBHOOK_RECON_DEGRADED_MIN_SAMPLE",
+                "WEBHOOK_RECON_DEGRADED_DEAD_RATE",
+                "WEBHOOK_RECON_DEGRADED_RECOVERY_WINDOW_DAYS",
+                "WEBHOOK_RECON_MISSING_GRACE_MINUTES",
+                "WEBHOOK_RECON_LOOKBACK_DAYS",
+                "WEBHOOK_RECON_AUTO_DDL",
+                "PGCORE_READ_DB_URL",
+                "PGCORE_READ_DB_USER",
+                "PGCORE_READ_DB_PASSWORD",
+                "PGCORE_READ_DB_DRIVER",
+            )
+            val missingReconciliation = reconciliationRequired.filter { environment.getProperty(it).isNullOrBlank() }
+            if (missingReconciliation.isNotEmpty()) {
+                throw IllegalStateException("${CommonErrorCode.BASE_PROPERTIES_INVALID.message}: ${missingReconciliation.joinToString(", ")}")
+            }
         }
     }
 }

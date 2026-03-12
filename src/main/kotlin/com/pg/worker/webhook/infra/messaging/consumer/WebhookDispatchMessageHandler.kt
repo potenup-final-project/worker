@@ -24,7 +24,7 @@ class WebhookDispatchMessageHandler(
             return true
         }
 
-        if (message.schemaVersion != 1) {
+        if (message.schemaVersion != WebhookDispatchMessage.CURRENT_SCHEMA_VERSION) {
             log.warn("[WebhookDispatchMessageHandler] unsupported schemaVersion={} messageId={}", message.schemaVersion, message.messageId)
             return true
         }
