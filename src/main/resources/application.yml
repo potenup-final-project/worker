@@ -88,3 +88,6 @@ pgcore:
 logging:
   pattern:
     level: "%5p [traceId:%X{traceId} messageId:%X{messageId} eventId:%X{eventId} deliveryId:%X{deliveryId}]"
+    slow-threshold-ms: ${APP_LOGGING_SLOW_THRESHOLD_MS}
+
+
