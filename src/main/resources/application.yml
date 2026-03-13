@@ -29,6 +29,18 @@ spring:
       sqs:
         endpoint: ${AWS_SQS_ENDPOINT:}
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, prometheus
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: pgworker
+
 webhook:
   recon:
     enabled: ${WEBHOOK_RECON_ENABLED}
