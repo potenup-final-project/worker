@@ -6,13 +6,17 @@ import com.pg.worker.settlement.application.usecase.command.RecordSettlementComm
 import com.pg.worker.settlement.application.usecase.command.dto.RecordSettlementCommand
 import io.awspring.cloud.sqs.annotation.SqsListener
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Value
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.messaging.handler.annotation.Payload
 import org.springframework.stereotype.Component
 
 @Component
+@ConditionalOnProperty(prefix = "settlement.sqs", name = ["enabled"], havingValue = "true")
 class PaymentEventSqsConsumer(
     private val recordSettlementCommandUseCase: RecordSettlementCommandUseCase,
-    private val objectMapper: ObjectMapper
+    private val objectMapper: ObjectMapper,
+    @Value("\${settlement.sqs.queue-name}") private val queueName: String,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -33,9 +37,9 @@ class PaymentEventSqsConsumer(
      *      기술적 장애로 인해 처리 완료를 확정할 수 없다는 뜻이다.
      *    - 이 경우 예외를 다시 던져 SQS 재시도 / DLQ 정책을 타게 한다.
      */
-    @SqsListener("payment-event-queue")
+    @SqsListener("\${settlement.sqs.queue-name}")
     fun consume(@Payload message: String) {
-        log.info("[SQS-Consumer] payment-event-queue에서 메시지를 수신했습니다.")
+        log.info("[SQS-Consumer] {}에서 메시지를 수신했습니다.", queueName)
 
         val command = try {
             objectMapper.readValue(message, RecordSettlementCommand::class.java)

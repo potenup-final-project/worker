@@ -46,8 +46,21 @@ class RequiredPropertiesValidator(
         }
 
         val sqsEnabled = environment.getProperty("WEBHOOK_SQS_ENABLED")?.toBooleanStrictOrNull() == true
-        if (sqsEnabled && environment.getProperty("WEBHOOK_SQS_QUEUE_URL").isNullOrBlank()) {
-            throw IllegalStateException(CommonErrorCode.RELAY_SQS_QUEUE_URL_MISSING.message)
+        if (sqsEnabled) {
+            if (environment.getProperty("WEBHOOK_SQS_QUEUE_URL").isNullOrBlank()) {
+                throw IllegalStateException(CommonErrorCode.RELAY_SQS_QUEUE_URL_MISSING.message)
+            }
+
+            validateAwsCredentials()
+        }
+
+        val settlementSqsEnabled = environment.getProperty("SETTLEMENT_SQS_ENABLED")?.toBooleanStrictOrNull() == true
+        if (settlementSqsEnabled) {
+            if (environment.getProperty("SETTLEMENT_SQS_QUEUE_NAME").isNullOrBlank()) {
+                throw IllegalStateException("${CommonErrorCode.BASE_PROPERTIES_INVALID.message}: SETTLEMENT_SQS_QUEUE_NAME")
+            }
+
+            validateAwsCredentials()
         }
 
         val reconciliationEnabled = environment.getProperty("WEBHOOK_RECON_ENABLED")?.toBooleanStrictOrNull() == true
@@ -73,6 +86,17 @@ class RequiredPropertiesValidator(
             if (missingReconciliation.isNotEmpty()) {
                 throw IllegalStateException("${CommonErrorCode.BASE_PROPERTIES_INVALID.message}: ${missingReconciliation.joinToString(", ")}")
             }
+        }
+    }
+
+    private fun validateAwsCredentials() {
+        val awsCredentialsRequired = listOf(
+            "AWS_ACCESS_KEY_ID",
+            "AWS_SECRET_ACCESS_KEY",
+        )
+        val missingAwsCredentials = awsCredentialsRequired.filter { environment.getProperty(it).isNullOrBlank() }
+        if (missingAwsCredentials.isNotEmpty()) {
+            throw IllegalStateException("${CommonErrorCode.BASE_PROPERTIES_INVALID.message}: ${missingAwsCredentials.joinToString(", ")}")
         }
     }
 }

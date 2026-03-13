@@ -1,4 +1,6 @@
 spring:
+  config:
+    import: optional:file:.env[.properties]
   datasource:
     url: ${DB_URL}
     username: ${DB_USER}
@@ -20,12 +22,12 @@ spring:
   cloud:
     aws:
       region:
-        static: ap-northeast-2
+        static: ${AWS_REGION}
       credentials:
-        access-key: test
-        secret-key: test
+        access-key: ${AWS_ACCESS_KEY_ID:}
+        secret-key: ${AWS_SECRET_ACCESS_KEY:}
       sqs:
-        endpoint: http://localhost:9324
+        endpoint: ${AWS_SQS_ENDPOINT:}
 
 webhook:
   recon:
@@ -72,11 +74,20 @@ webhook:
   endpoint:
     require-https: ${WEBHOOK_REQUIRE_HTTPS}
 
+settlement:
+  sqs:
+    enabled: ${SETTLEMENT_SQS_ENABLED:false}
+    queue-name: ${SETTLEMENT_SQS_QUEUE_NAME:}
+
 server:
   port: 8081
 
 aws:
   region: ${AWS_REGION}
+  access-key-id: ${AWS_ACCESS_KEY_ID:}
+  secret-access-key: ${AWS_SECRET_ACCESS_KEY:}
+  sqs:
+    endpoint: ${AWS_SQS_ENDPOINT:}
 
 pgcore:
   read-datasource:
