@@ -39,6 +39,7 @@ jobs:
         run: |
           docker run -d \
             --name pg-worker \
+            --network pg-net \
             --env-file /home/ec2-user/app/pg-worker.env \
             -p 8080:8080 \
             --restart always \
