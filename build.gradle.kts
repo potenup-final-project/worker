@@ -30,6 +30,7 @@ dependencies {
     developmentOnly("org.springframework.boot:spring-boot-devtools")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
 
+
     // --- AWS ---
     implementation("io.awspring.cloud:spring-cloud-aws-starter-sqs:3.3.0")
 
