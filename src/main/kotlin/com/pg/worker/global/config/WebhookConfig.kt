@@ -21,10 +21,19 @@ class WebhookConfig {
         .configure(SerializationFeature.INDENT_OUTPUT, false)
         .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, true)
 
-    @Bean(name = ["sqsPollingScheduler"])
-    fun sqsPollingScheduler(): ThreadPoolTaskScheduler = ThreadPoolTaskScheduler().apply {
+    @Bean(name = ["webhookSqsPollingScheduler"])
+    fun webhookSqsPollingScheduler(): ThreadPoolTaskScheduler = ThreadPoolTaskScheduler().apply {
         poolSize = 1
-        setThreadNamePrefix("sqs-poller-")
+        setThreadNamePrefix("webhook-sqs-poller-")
+        setWaitForTasksToCompleteOnShutdown(true)
+        setAwaitTerminationSeconds(30)
+        initialize()
+    }
+
+    @Bean(name = ["settlementSqsPollingScheduler"])
+    fun settlementSqsPollingScheduler(): ThreadPoolTaskScheduler = ThreadPoolTaskScheduler().apply {
+        poolSize = 1
+        setThreadNamePrefix("settlement-sqs-poller-")
         setWaitForTasksToCompleteOnShutdown(true)
         setAwaitTerminationSeconds(30)
         initialize()
@@ -34,6 +43,15 @@ class WebhookConfig {
     fun webhookWorkerScheduler(): ThreadPoolTaskScheduler = ThreadPoolTaskScheduler().apply {
         poolSize = 2
         setThreadNamePrefix("webhook-worker-")
+        setWaitForTasksToCompleteOnShutdown(true)
+        setAwaitTerminationSeconds(30)
+        initialize()
+    }
+
+    @Bean(name = ["settlementWorkerScheduler"])
+    fun settlementWorkerScheduler(): ThreadPoolTaskScheduler = ThreadPoolTaskScheduler().apply {
+        poolSize = 2
+        setThreadNamePrefix("settlement-worker-")
         setWaitForTasksToCompleteOnShutdown(true)
         setAwaitTerminationSeconds(30)
         initialize()

@@ -14,7 +14,7 @@ class ExternalReconciliationJob(
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
-    @Scheduled(cron = "0 30 3 * * *")
+    @Scheduled(cron = "0 30 3 * * *", scheduler = "settlementWorkerScheduler")
     fun runDailyExternalReconciliation() {
         val targetDate = LocalDate.now().minusDays(1)
         log.info("[외부대사-배치] 시작. 대상일={}", targetDate)

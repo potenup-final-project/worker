@@ -26,9 +26,16 @@ class WebhookDispatchSqsConsumer(
         require(visibilityTimeoutSeconds >= 10) {
             "webhook.sqs.visibility-timeout-seconds must be at least 10 seconds"
         }
+        log.info(
+            "[WebhookDispatchSqsConsumer] initialized queueUrl={} pollMax={} waitSec={} visibilitySec={}",
+            queueUrl,
+            maxMessages,
+            waitTimeSeconds,
+            visibilityTimeoutSeconds,
+        )
     }
 
-    @Scheduled(fixedDelayString = "\${webhook.sqs.poll-interval-ms}", scheduler = "sqsPollingScheduler")
+    @Scheduled(fixedDelayString = "\${webhook.sqs.poll-interval-ms}", scheduler = "webhookSqsPollingScheduler")
     fun poll() {
         val messages = sqsClient.receiveMessage { req ->
             req.queueUrl(queueUrl)

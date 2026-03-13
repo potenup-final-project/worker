@@ -35,6 +35,7 @@ dependencies {
 
     // --- Kotlin ---
     implementation("org.jetbrains.kotlin:kotlin-reflect")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
 
     // --- DB Driver (MySQL) ---

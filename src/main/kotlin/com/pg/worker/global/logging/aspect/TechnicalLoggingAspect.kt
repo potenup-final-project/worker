@@ -50,7 +50,7 @@ class TechnicalLoggingAspect(
             val result = joinPoint.proceed()
             val durationMs = System.currentTimeMillis() - start
 
-            if (durationMs >= slowThresholdMs) {
+            if (durationMs >= slowThresholdMs && !isExpectedLongPolling(signature)) {
                 log.warn(serialize(successPayload(signature, durationMs)))
             }
 
@@ -123,6 +123,14 @@ class TechnicalLoggingAspect(
             typeName.contains(".infra.") -> "INFRA"
             else -> "UNKNOWN"
         }
+    }
+
+    private fun isExpectedLongPolling(signature: MethodSignature): Boolean {
+        val className = signature.declaringType.simpleName
+        return signature.method.name == "poll" && (
+            className == "WebhookDispatchSqsConsumer" ||
+                className == "SettlementDispatchSqsConsumer"
+            )
     }
 
     private fun serialize(payload: Map<String, Any?>): String {

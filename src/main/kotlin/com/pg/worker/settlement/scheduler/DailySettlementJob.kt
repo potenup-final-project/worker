@@ -18,7 +18,7 @@ class DailySettlementJob(
      * 정산 집계 배치 (매일 새벽 2시 실행)
      * - 어제(`LocalDate.now().minusDays(1)`)까지 도래한 미집계 건들을 모두 처리
      */
-    @Scheduled(cron = "0 0 2 * * *")
+    @Scheduled(cron = "0 0 2 * * *", scheduler = "settlementWorkerScheduler")
     fun runAggregation() {
         val targetDate = LocalDate.now().minusDays(1)
         log.info("[정산-집계-배치] 시작. 기준일: {}", targetDate)
