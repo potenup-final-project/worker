@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory
 import org.slf4j.MDC
 import org.springframework.stereotype.Component
 import java.time.LocalDateTime
+import java.time.format.DateTimeParseException
 import java.time.format.DateTimeFormatter
 
 @Component
@@ -18,17 +19,17 @@ class SettlementDispatchMessageHandler(
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
-    fun handle(messageBody: String): Boolean {
+    fun handle(messageBody: String): SettlementDispatchHandleResult {
         val message = try {
             objectMapper.readValue(messageBody, SettlementDispatchMessage::class.java)
         } catch (e: Exception) {
-            log.error("[PaymentDispatchMessageHandler] invalid message envelope format", e)
-            return true
+            log.error("[SettlementDispatchMessageHandler] invalid message envelope format", e)
+            return SettlementDispatchHandleResult.NonRetryableFailure("INVALID_ENVELOPE")
         }
 
         if (message.schemaVersion != 1) {
-            log.warn("[PaymentDispatchMessageHandler] unsupported schemaVersion={} eventId={}", message.schemaVersion, message.eventId)
-            return true
+            log.warn("[SettlementDispatchMessageHandler] unsupported schemaVersion={} eventId={}", message.schemaVersion, message.eventId)
+            return SettlementDispatchHandleResult.NonRetryableFailure("UNSUPPORTED_SCHEMA_VERSION")
         }
 
         val messageId = message.messageId
@@ -37,13 +38,13 @@ class SettlementDispatchMessageHandler(
 
         if (messageId.isBlank() || occurredAt.isBlank() || eventType.isBlank()) {
             log.warn(
-                "[PaymentDispatchMessageHandler] missing required fields schemaVersion={} messageId={} occurredAt={} eventType={}",
+                "[SettlementDispatchMessageHandler] missing required fields schemaVersion={} messageId={} occurredAt={} eventType={}",
                 message.schemaVersion,
                 messageId,
                 occurredAt,
                 eventType,
             )
-            return true
+            return SettlementDispatchHandleResult.NonRetryableFailure("MISSING_REQUIRED_FIELDS")
         }
 
         message.traceId?.let { MDC.put("traceId", it) }
@@ -55,8 +56,25 @@ class SettlementDispatchMessageHandler(
             val payload = try {
                 objectMapper.readValue(message.payload, SettlementEventPayload::class.java)
             } catch (e: Exception) {
-                log.error("[PaymentDispatchMessageHandler] invalid payload JSON. eventId={}", message.eventId, e)
-                return true
+                log.error("[SettlementDispatchMessageHandler] invalid payload JSON. eventId={}", message.eventId, e)
+                return SettlementDispatchHandleResult.NonRetryableFailure("INVALID_PAYLOAD")
+            }
+
+            val transactionType = normalizeTransactionType(payload.transactionType)
+                ?: run {
+                    log.warn(
+                        "[SettlementDispatchMessageHandler] unsupported transactionType={} eventId={}",
+                        payload.transactionType,
+                        message.eventId,
+                    )
+                    return SettlementDispatchHandleResult.NonRetryableFailure("UNSUPPORTED_TRANSACTION_TYPE")
+                }
+
+            val eventOccurredAt = try {
+                LocalDateTime.parse(message.occurredAt, DateTimeFormatter.ISO_DATE_TIME)
+            } catch (e: DateTimeParseException) {
+                log.error("[SettlementDispatchMessageHandler] invalid occurredAt format. eventId={}", message.eventId, e)
+                return SettlementDispatchHandleResult.NonRetryableFailure("INVALID_OCCURRED_AT")
             }
 
             val command = RecordSettlementCommand(
@@ -66,19 +84,33 @@ class SettlementDispatchMessageHandler(
                 orderId = payload.orderId,
                 providerTxId = payload.providerTxId,
                 merchantId = message.merchantId,
-                transactionType = payload.transactionType,
+                transactionType = transactionType,
                 amount = payload.amount,
-                eventOccurredAt = LocalDateTime.parse(message.occurredAt, DateTimeFormatter.ISO_DATE_TIME)
+                eventOccurredAt = eventOccurredAt,
             )
-            
+
             recordSettlementCommandUseCase.record(command)
-            log.info("[PaymentDispatchMessageHandler] message processed successfully. eventId={}", message.eventId)
-            true
+            log.info("[SettlementDispatchMessageHandler] message accepted. eventId={}", message.eventId)
+            SettlementDispatchHandleResult.Success
         } catch (e: Exception) {
-            log.error("[PaymentDispatchMessageHandler] business processing failure. eventId={}", message.eventId, e)
-            false
+            log.error("[SettlementDispatchMessageHandler] business processing failure. eventId={}", message.eventId, e)
+            SettlementDispatchHandleResult.RetryableFailure("BUSINESS_PROCESSING_FAILED")
         } finally {
             MDC.clear()
         }
     }
+
+    private fun normalizeTransactionType(rawType: String): String? {
+        return when (rawType.trim().uppercase()) {
+            "APPROVE", "PAYMENT" -> "APPROVE"
+            "CANCEL" -> "CANCEL"
+            else -> null
+        }
+    }
+}
+
+sealed interface SettlementDispatchHandleResult {
+    data object Success : SettlementDispatchHandleResult
+    data class RetryableFailure(val reason: String) : SettlementDispatchHandleResult
+    data class NonRetryableFailure(val reason: String) : SettlementDispatchHandleResult
 }
