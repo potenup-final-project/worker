@@ -3,10 +3,7 @@ package com.pg.worker.settlement.application.service
 import com.pg.worker.settlement.application.repository.SettlementLedgerRepository
 import com.pg.worker.settlement.application.repository.SettlementPolicyRepository
 import com.pg.worker.settlement.application.repository.SettlementRawDataRepository
-import com.pg.worker.settlement.domain.SettlementLedger
-import com.pg.worker.settlement.domain.SettlementPolicy
-import com.pg.worker.settlement.domain.SettlementRawData
-import com.pg.worker.settlement.domain.TransactionType
+import com.pg.worker.settlement.domain.*
 import com.pg.worker.settlement.domain.exception.NonRetryableException
 import com.pg.worker.settlement.domain.exception.PendingDependencyException
 import com.pg.worker.settlement.domain.exception.RetryableException
@@ -19,20 +16,15 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
-import java.math.BigDecimal
-import java.math.RoundingMode
 
 @Component
 class SettlementLedgerProcessor(
     private val rawRepository: SettlementRawDataRepository,
     private val ledgerRepository: SettlementLedgerRepository,
-    private val policyRepository: SettlementPolicyRepository
+    private val policyRepository: SettlementPolicyRepository,
+    private val hostFeePolicy: HostFeePolicy
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
-
-    // TODO 정책으로 분리
-    // 카드사 원가 수수료율 고정 (테스트용 2.1%)
-    private val HOST_FEE_RATE = BigDecimal("0.021")
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     fun process(rawId: Long) {
@@ -103,8 +95,8 @@ class SettlementLedgerProcessor(
     }
 
     private fun buildApproveLedger(raw: SettlementRawData, policy: SettlementPolicy): SettlementLedger {
-        val hostFee = calculateFee(raw.amount, HOST_FEE_RATE)
-        val totalFee = calculateFee(raw.amount, policy.feeRate)
+        val hostFee = hostFeePolicy.calculateHostFee(raw.amount)
+        val totalFee = hostFeePolicy.calculateFee(raw.amount, policy.feeRate)
         val serviceFee = totalFee - hostFee // PG 마진 수수료
         
         val settlementBaseDate = raw.eventOccurredAt.plusDays(policy.settlementCycleDays.toLong()).toLocalDate()
@@ -168,8 +160,8 @@ class SettlementLedgerProcessor(
         originalApproveRaw: SettlementRawData,
         originalLedger: SettlementLedger
     ): SettlementLedger {
-        val hostFee = calculateFee(raw.amount, HOST_FEE_RATE)
-        val totalFee = calculateFee(raw.amount, originalLedger.policyFeeRate)
+        val hostFee = hostFeePolicy.calculateHostFee(raw.amount)
+        val totalFee = hostFeePolicy.calculateFee(raw.amount, originalLedger.policyFeeRate)
         val serviceFee = totalFee - hostFee
 
         val cancelSettlementBaseDate = raw.eventOccurredAt
@@ -186,11 +178,6 @@ class SettlementLedgerProcessor(
             policyFeeRate = originalLedger.policyFeeRate,
             policySettlementCycleDays = originalLedger.policySettlementCycleDays
         )
-    }
-
-    private fun calculateFee(amount: Long, feeRate: BigDecimal): Long {
-        return (amount.toBigDecimal() * feeRate)
-            .setScale(0, RoundingMode.HALF_UP).toLong()
     }
 
     private fun handleDataIntegrityViolation(raw: SettlementRawData, e: DataIntegrityViolationException) {
