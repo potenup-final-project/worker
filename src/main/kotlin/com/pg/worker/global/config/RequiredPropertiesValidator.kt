@@ -11,7 +11,7 @@ class RequiredPropertiesValidator(
 ) {
     @PostConstruct
     fun validate() {
-        val required = listOf(
+        val baseRequired = listOf(
             "DB_USER",
             "DB_PASSWORD",
             "AWS_REGION",
@@ -32,21 +32,43 @@ class RequiredPropertiesValidator(
             "WEBHOOK_LIMITER_REDIS_FAIL_OPEN",
             "REDIS_HOST",
             "REDIS_PORT",
-            "WEBHOOK_SQS_ENABLED",
-            "WEBHOOK_SQS_POLL_INTERVAL_MS",
-            "WEBHOOK_SQS_MAX_MESSAGES",
-            "WEBHOOK_SQS_WAIT_SECONDS",
-            "WEBHOOK_SQS_VISIBILITY_TIMEOUT_SECONDS",
         )
 
-        val missing = required.filter { environment.getProperty(it).isNullOrBlank() }
-        if (missing.isNotEmpty()) {
-            throw IllegalStateException("${CommonErrorCode.BASE_PROPERTIES_INVALID.message}: ${missing.joinToString(", ")}")
+        val missingBase = baseRequired.filter { environment.getProperty(it).isNullOrBlank() }
+        if (missingBase.isNotEmpty()) {
+            throw IllegalStateException("${CommonErrorCode.BASE_PROPERTIES_INVALID.message}: ${missingBase.joinToString(", ")}")
         }
 
-        val sqsEnabled = environment.getProperty("WEBHOOK_SQS_ENABLED")?.toBooleanStrictOrNull() == true
-        if (sqsEnabled && environment.getProperty("WEBHOOK_SQS_QUEUE_URL").isNullOrBlank()) {
-            throw IllegalStateException(CommonErrorCode.RELAY_SQS_QUEUE_URL_MISSING.message)
+        // Webhook SQS validation
+        val webhookSqsEnabled = environment.getProperty("WEBHOOK_SQS_ENABLED")?.toBooleanStrictOrNull() == true
+        if (webhookSqsEnabled) {
+            val webhookRequired = listOf(
+                "WEBHOOK_SQS_QUEUE_URL",
+                "WEBHOOK_SQS_POLL_INTERVAL_MS",
+                "WEBHOOK_SQS_MAX_MESSAGES",
+                "WEBHOOK_SQS_WAIT_SECONDS",
+                "WEBHOOK_SQS_VISIBILITY_TIMEOUT_SECONDS",
+            )
+            val missingWebhook = webhookRequired.filter { environment.getProperty(it).isNullOrBlank() }
+            if (missingWebhook.isNotEmpty()) {
+                throw IllegalStateException("${CommonErrorCode.BASE_PROPERTIES_INVALID.message} (Webhook SQS): ${missingWebhook.joinToString(", ")}")
+            }
+        }
+
+        // Settlement SQS validation
+        val settlementSqsEnabled = environment.getProperty("SETTLEMENT_SQS_ENABLED")?.toBooleanStrictOrNull() == true
+        if (settlementSqsEnabled) {
+            val settlementRequired = listOf(
+                "SETTLEMENT_SQS_QUEUE_URL",
+                "SETTLEMENT_SQS_POLL_INTERVAL_MS",
+                "SETTLEMENT_SQS_MAX_MESSAGES",
+                "SETTLEMENT_SQS_WAIT_SECONDS",
+                "SETTLEMENT_SQS_VISIBILITY_TIMEOUT_SECONDS",
+            )
+            val missingSettlement = settlementRequired.filter { environment.getProperty(it).isNullOrBlank() }
+            if (missingSettlement.isNotEmpty()) {
+                throw IllegalStateException("${CommonErrorCode.BASE_PROPERTIES_INVALID.message} (Settlement SQS): ${missingSettlement.joinToString(", ")}")
+            }
         }
     }
 }

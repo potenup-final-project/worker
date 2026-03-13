@@ -30,6 +30,7 @@ class SettlementLedgerProcessor(
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
+    // TODO 정책으로 분리
     // 카드사 원가 수수료율 고정 (테스트용 2.1%)
     private val HOST_FEE_RATE = BigDecimal("0.021")
 
