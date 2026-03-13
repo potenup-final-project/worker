@@ -19,6 +19,18 @@ class WebhookEndpointReadRepositoryImpl(
             .where(
                 qEndpoint.merchantId.eq(merchantId),
                 qEndpoint.endpointId.`in`(endpointIds),
+                qEndpoint.isActive.eq(true),
+            )
+            .fetch()
+    }
+
+    override fun findActiveEndpointIdsByMerchantId(merchantId: Long): List<Long> {
+        return queryFactory
+            .select(qEndpoint.endpointId)
+            .from(qEndpoint)
+            .where(
+                qEndpoint.merchantId.eq(merchantId),
+                qEndpoint.isActive.eq(true),
             )
             .fetch()
     }

@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.SerializationFeature
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.scheduling.annotation.EnableScheduling
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
 
 // 스케줄러 활성화 및 ObjectMapper 빈 등록
 @Configuration
@@ -19,4 +20,40 @@ class WebhookConfig {
         .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true)
         .configure(SerializationFeature.INDENT_OUTPUT, false)
         .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, true)
+
+    @Bean(name = ["webhookSqsPollingScheduler"])
+    fun webhookSqsPollingScheduler(): ThreadPoolTaskScheduler = ThreadPoolTaskScheduler().apply {
+        poolSize = 1
+        setThreadNamePrefix("webhook-sqs-poller-")
+        setWaitForTasksToCompleteOnShutdown(true)
+        setAwaitTerminationSeconds(30)
+        initialize()
+    }
+
+    @Bean(name = ["settlementSqsPollingScheduler"])
+    fun settlementSqsPollingScheduler(): ThreadPoolTaskScheduler = ThreadPoolTaskScheduler().apply {
+        poolSize = 1
+        setThreadNamePrefix("settlement-sqs-poller-")
+        setWaitForTasksToCompleteOnShutdown(true)
+        setAwaitTerminationSeconds(30)
+        initialize()
+    }
+
+    @Bean(name = ["webhookWorkerScheduler"])
+    fun webhookWorkerScheduler(): ThreadPoolTaskScheduler = ThreadPoolTaskScheduler().apply {
+        poolSize = 2
+        setThreadNamePrefix("webhook-worker-")
+        setWaitForTasksToCompleteOnShutdown(true)
+        setAwaitTerminationSeconds(30)
+        initialize()
+    }
+
+    @Bean(name = ["settlementWorkerScheduler"])
+    fun settlementWorkerScheduler(): ThreadPoolTaskScheduler = ThreadPoolTaskScheduler().apply {
+        poolSize = 2
+        setThreadNamePrefix("settlement-worker-")
+        setWaitForTasksToCompleteOnShutdown(true)
+        setAwaitTerminationSeconds(30)
+        initialize()
+    }
 }

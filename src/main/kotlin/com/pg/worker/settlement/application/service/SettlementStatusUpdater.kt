@@ -1,0 +1,54 @@
+package com.pg.worker.settlement.application.service
+
+import com.pg.worker.settlement.application.repository.SettlementRawDataRepository
+import com.pg.worker.settlement.domain.SettlementRetryPolicy
+import org.slf4j.LoggerFactory
+import org.springframework.stereotype.Component
+import org.springframework.transaction.annotation.Propagation
+import org.springframework.transaction.annotation.Transactional
+import java.time.LocalDateTime
+
+@Component
+class SettlementStatusUpdater(
+    private val rawRepository: SettlementRawDataRepository
+) {
+    private val log = LoggerFactory.getLogger(javaClass)
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    fun updateToPending(rawId: Long, reason: String) {
+        rawRepository.findById(rawId)?.apply {
+            if (this.retryCount >= SettlementRetryPolicy.MAX_RETRY_COUNT) {
+                log.error("[Settlement] [PENDING_EXHAUSTED] 의존성 대기 임계치 초과. 영구 실패 처리. rawId={}, retryCount={}", 
+                    rawId, this.retryCount)
+                markFailedNonRetryable("Pending dependency timeout: $reason")
+            } else {
+                val delayMinutes = SettlementRetryPolicy.pendingNextRetryDelayMinutes(this.retryCount)
+                markPendingDependency(reason, LocalDateTime.now().plusMinutes(delayMinutes))
+            }
+            rawRepository.save(this)
+        } ?: log.warn("[Settlement] [Updater] PENDING 상태 전이 실패. 데이터를 찾을 수 없음. rawId={}, reason={}", rawId, reason)
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    fun updateToFailedRetryable(rawId: Long, reason: String) {
+        rawRepository.findById(rawId)?.apply {
+            if (this.retryCount >= SettlementRetryPolicy.MAX_RETRY_COUNT) {
+                log.error("[Settlement] [RETRY_EXHAUSTED] 최대 재시도 횟수 초과. 영구 실패 처리. rawId={}, retryCount={}", 
+                    rawId, this.retryCount)
+                markFailedNonRetryable("Max retry exhausted: $reason")
+            } else {
+                val delayMinutes = SettlementRetryPolicy.retryableNextRetryDelayMinutes(this.retryCount)
+                markFailedRetryable(reason, LocalDateTime.now().plusMinutes(delayMinutes))
+            }
+            rawRepository.save(this)
+        } ?: log.warn("[Settlement] [Updater] RETRYABLE 상태 전이 실패. 데이터를 찾을 수 없음. rawId={}, reason={}", rawId, reason)
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    fun updateToFailedNonRetryable(rawId: Long, reason: String) {
+        rawRepository.findById(rawId)?.apply {
+            markFailedNonRetryable(reason)
+            rawRepository.save(this)
+        } ?: log.warn("[Settlement] [Updater] NON_RETRYABLE 상태 전이 실패. 데이터를 찾을 수 없음. rawId={}, reason={}", rawId, reason)
+    }
+}
