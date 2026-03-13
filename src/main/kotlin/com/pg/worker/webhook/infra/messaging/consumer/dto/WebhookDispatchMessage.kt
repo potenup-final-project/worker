@@ -1,4 +1,4 @@
-package com.pg.worker.webhook.consumer.dto
+package com.pg.worker.webhook.infra.messaging.consumer.dto
 
 import java.util.UUID
 

@@ -3,7 +3,8 @@ package com.pg.worker.webhook.consumer
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.pg.worker.webhook.application.usecase.repository.WebhookDeliveryStateRepository
 import com.pg.worker.webhook.application.usecase.repository.WebhookEndpointReadRepository
-import com.pg.worker.webhook.consumer.dto.WebhookDispatchMessage
+import com.pg.worker.webhook.infra.messaging.consumer.WebhookDispatchMessageHandler
+import com.pg.worker.webhook.infra.messaging.consumer.dto.WebhookDispatchMessage
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk

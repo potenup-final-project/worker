@@ -76,8 +76,8 @@ webhook:
 
 settlement:
   sqs:
-    enabled: ${SETTLEMENT_SQS_ENABLED:false}
-    queue-name: ${SETTLEMENT_SQS_QUEUE_NAME:}
+    enabled: ${SETTLEMENT_SQS_ENABLED}
+    queue-url: ${SETTLEMENT_SQS_QUEUE_URL}
 
 server:
   port: 8081
@@ -99,3 +99,6 @@ pgcore:
 logging:
   pattern:
     level: "%5p [traceId:%X{traceId} messageId:%X{messageId} eventId:%X{eventId} deliveryId:%X{deliveryId}]"
+    slow-threshold-ms: ${APP_LOGGING_SLOW_THRESHOLD_MS}
+
+
