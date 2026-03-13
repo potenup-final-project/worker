@@ -34,10 +34,6 @@ class SettlementRawDataRepositoryImpl(
         return jpaRepository.findById(id).orElse(null)
     }
 
-    override fun findByTransactionId(transactionId: Long): SettlementRawData? {
-        return jpaRepository.findByTransactionId(transactionId)
-    }
-
     override fun findAllByTransactionIdIn(transactionIds: List<Long>): List<SettlementRawData> {
         return jpaRepository.findAllByTransactionIdIn(transactionIds)
     }

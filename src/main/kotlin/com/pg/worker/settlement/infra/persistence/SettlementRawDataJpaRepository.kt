@@ -8,9 +8,6 @@ import java.time.LocalDateTime
 interface SettlementRawDataJpaRepository : JpaRepository<SettlementRawData, Long> {
     fun existsByEventId(eventId: String): Boolean
     fun findByPaymentKeyAndTransactionType(paymentKey: String, type: TransactionType): SettlementRawData?
-    fun findByTransactionId(transactionId: Long): SettlementRawData?
     fun findAllByTransactionIdIn(transactionIds: List<Long>): List<SettlementRawData>
-    fun findAllByEventOccurredAtBetween(from: LocalDateTime, to: LocalDateTime): List<SettlementRawData>
-    fun findAllByProviderTxIdIn(providerTxIds: List<String>): List<SettlementRawData>
     fun findAllByEventIdIn(eventIds: List<String>): List<SettlementRawData>
 }

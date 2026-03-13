@@ -11,8 +11,4 @@ class SettlementAggregateItemRepositoryImpl(
     override fun saveAll(items: List<SettlementAggregateItem>): List<SettlementAggregateItem> {
         return jpaRepository.saveAll(items)
     }
-
-    override fun findByLedgerId(ledgerId: Long): SettlementAggregateItem? {
-        return jpaRepository.findByLedgerId(ledgerId)
-    }
 }

@@ -13,10 +13,6 @@ class SettlementAggregateRepositoryImpl(
         return jpaRepository.save(aggregate)
     }
 
-    override fun findById(id: Long): SettlementAggregate? {
-        return jpaRepository.findById(id).orElse(null)
-    }
-
     override fun existsByMerchantIdAndSettlementBaseDate(merchantId: Long, baseDate: LocalDate): Boolean {
         return jpaRepository.existsByMerchantIdAndSettlementBaseDate(merchantId, baseDate)
     }
