@@ -56,8 +56,17 @@ class RequiredPropertiesValidator(
 
         val settlementSqsEnabled = environment.getProperty("SETTLEMENT_SQS_ENABLED")?.toBooleanStrictOrNull() == true
         if (settlementSqsEnabled) {
-            if (environment.getProperty("SETTLEMENT_SQS_QUEUE_NAME").isNullOrBlank()) {
-                throw IllegalStateException("${CommonErrorCode.BASE_PROPERTIES_INVALID.message}: SETTLEMENT_SQS_QUEUE_NAME")
+            val settlementRequired = listOf(
+                "SETTLEMENT_SQS_QUEUE_URL",
+                "SETTLEMENT_SQS_DLQ_URL",
+                "SETTLEMENT_SQS_POLL_INTERVAL_MS",
+                "SETTLEMENT_SQS_MAX_MESSAGES",
+                "SETTLEMENT_SQS_WAIT_SECONDS",
+                "SETTLEMENT_SQS_VISIBILITY_TIMEOUT_SECONDS",
+            )
+            val missingSettlement = settlementRequired.filter { environment.getProperty(it).isNullOrBlank() }
+            if (missingSettlement.isNotEmpty()) {
+                throw IllegalStateException("${CommonErrorCode.BASE_PROPERTIES_INVALID.message}: ${missingSettlement.joinToString(", ")}")
             }
 
             validateAwsCredentials()

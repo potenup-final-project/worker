@@ -1,7 +1,6 @@
 package com.pg.worker.global.config
 
 import org.springframework.beans.factory.annotation.Value
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
@@ -11,7 +10,6 @@ import software.amazon.awssdk.services.sqs.SqsClient
 import java.net.URI
 
 @Configuration
-@ConditionalOnProperty(prefix = "webhook.sqs", name = ["enabled"], havingValue = "true")
 class SqsConfig(
     @Value("\${aws.region}") private val region: String,
     @Value("\${aws.access-key-id}") private val accessKeyId: String,
