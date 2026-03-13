@@ -22,7 +22,8 @@ class SettlementStatusUpdater(
                     rawId, this.retryCount)
                 markFailedNonRetryable("Pending dependency timeout: $reason")
             } else {
-                markPendingDependency(reason, LocalDateTime.now().plusMinutes(SettlementRetryPolicy.PENDING_DELAY_MINUTES))
+                val delayMinutes = SettlementRetryPolicy.pendingNextRetryDelayMinutes(this.retryCount)
+                markPendingDependency(reason, LocalDateTime.now().plusMinutes(delayMinutes))
             }
             rawRepository.save(this)
         } ?: log.warn("[Settlement] [Updater] PENDING 상태 전이 실패. 데이터를 찾을 수 없음. rawId={}, reason={}", rawId, reason)
@@ -36,7 +37,8 @@ class SettlementStatusUpdater(
                     rawId, this.retryCount)
                 markFailedNonRetryable("Max retry exhausted: $reason")
             } else {
-                markFailedRetryable(reason, LocalDateTime.now().plusMinutes(SettlementRetryPolicy.RETRY_DELAY_MINUTES))
+                val delayMinutes = SettlementRetryPolicy.retryableNextRetryDelayMinutes(this.retryCount)
+                markFailedRetryable(reason, LocalDateTime.now().plusMinutes(delayMinutes))
             }
             rawRepository.save(this)
         } ?: log.warn("[Settlement] [Updater] RETRYABLE 상태 전이 실패. 데이터를 찾을 수 없음. rawId={}, reason={}", rawId, reason)
