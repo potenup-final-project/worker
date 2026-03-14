@@ -1,76 +1,173 @@
 package com.pg.worker.settlement.application.service
 
+import com.gop.logging.contract.LogPrefix
+import com.gop.logging.contract.LogResult
+import com.gop.logging.contract.LogSuffix
+import com.gop.logging.contract.LogType
+import com.gop.logging.contract.StepPrefix
+import com.gop.logging.contract.StructuredLogger
+import com.pg.worker.global.logging.WorkerLogPayloadKeys
 import com.pg.worker.settlement.application.usecase.command.RecordSettlementCommandUseCase
 import com.pg.worker.settlement.application.usecase.command.dto.RecordSettlementCommand
+import com.pg.worker.settlement.application.usecase.command.dto.RecordSettlementResult
+import com.pg.worker.settlement.domain.RawDataStatus
+import com.pg.worker.settlement.domain.SettlementRawData
 import com.pg.worker.settlement.domain.exception.NonRetryableException
 import com.pg.worker.settlement.domain.exception.PendingDependencyException
 import com.pg.worker.settlement.domain.exception.RetryableException
-import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 
 @Service
+@LogPrefix(StepPrefix.SETTLEMENT_LEDGER)
 class RecordSettlementService(
     private val rawDataWriter: SettlementRawDataWriter,
     private val ledgerProcessor: SettlementLedgerProcessor,
-    private val statusUpdater: SettlementStatusUpdater
+    private val statusUpdater: SettlementStatusUpdater,
+    private val structuredLogger: StructuredLogger
 ) : RecordSettlementCommandUseCase {
 
-    private val log = LoggerFactory.getLogger(javaClass)
-
-    override fun record(command: RecordSettlementCommand) {
+    @LogSuffix("record")
+    override fun record(command: RecordSettlementCommand): RecordSettlementResult {
         val raw = rawDataWriter.write(command) ?: run {
-            log.info("[Settlement] 이미 처리된 Raw 이벤트이므로 종료. eventId={}", command.eventId)
-            return
+            structuredLogger.info(
+                logType = LogType.FLOW,
+                result = LogResult.SKIP,
+                payload = mapOf(
+                    WorkerLogPayloadKeys.REASON to "already_processed_raw_event",
+                    WorkerLogPayloadKeys.EVENT_ID to command.eventId
+                )
+            )
+            return RecordSettlementResult.SkippedAlreadyProcessed
         }
 
         try {
             ledgerProcessor.process(raw.id)
-            log.info("[Settlement] 정산 처리 완료. eventId={}", command.eventId)
+            structuredLogger.info(
+                logType = LogType.FLOW,
+                result = LogResult.SUCCESS,
+                payload = mapOf(
+                    WorkerLogPayloadKeys.PHASE to "ledger_processed",
+                    WorkerLogPayloadKeys.EVENT_ID to command.eventId,
+                    WorkerLogPayloadKeys.RAW_ID to raw.id
+                )
+            )
+            return RecordSettlementResult.Success
         } catch (e: Exception) {
-            handleProcessingFailure(raw.id, command.eventId, e)
+            return handleProcessingFailure(raw.id, command.eventId, e)
         }
     }
 
-    private fun handleProcessingFailure(rawId: Long, eventId: String, e: Exception) {
+    private fun handleProcessingFailure(rawId: Long, eventId: String, e: Exception): RecordSettlementResult {
         when (e) {
                 is PendingDependencyException -> {
-                    log.info("[Settlement] 의존성 미충족 대기. eventId={}, reason={}", eventId, e.message)
-                    updateStatusSafely(rawId, eventId, "PENDING") {
+                    structuredLogger.info(
+                        logType = LogType.FLOW,
+                        result = LogResult.RETRY,
+                        payload = mapOf(
+                            WorkerLogPayloadKeys.PHASE to "pending_dependency",
+                            WorkerLogPayloadKeys.EVENT_ID to eventId,
+                            WorkerLogPayloadKeys.REASON to e.message
+                        )
+                    )
+                    val updated = updateStatusSafely(rawId, eventId, "PENDING") {
                         statusUpdater.updateToPending(rawId, e.message ?: "Dependency missing")
                     }
+                    return toResult(updated, e.message ?: "Dependency missing")
                 }
                 is NonRetryableException -> {
-                    log.warn("[Settlement] 비즈니스/정합성 오류 (영구 실패). eventId={}, reason={}", eventId, e.message)
+                    structuredLogger.warn(
+                        logType = LogType.FLOW,
+                        result = LogResult.FAIL,
+                        payload = mapOf(
+                            WorkerLogPayloadKeys.PHASE to "non_retryable_failure",
+                            WorkerLogPayloadKeys.EVENT_ID to eventId,
+                            WorkerLogPayloadKeys.REASON to e.message
+                        )
+                    )
                     updateStatusSafely(rawId, eventId, "NON_RETRYABLE") {
                         statusUpdater.updateToFailedNonRetryable(rawId, e.message ?: "Non-retryable error")
                     }
+                    return RecordSettlementResult.NonRetryableFailed(e.message ?: "Non-retryable error")
                 }
                 is RetryableException -> {
-                    log.warn("[Settlement] 기술적 일시 오류 (재시도 대상). eventId={}, reason={}", eventId, e.message)
-                    updateStatusSafely(rawId, eventId, "RETRYABLE") {
+                    structuredLogger.warn(
+                        logType = LogType.FLOW,
+                        result = LogResult.RETRY,
+                        payload = mapOf(
+                            WorkerLogPayloadKeys.PHASE to "retryable_failure",
+                            WorkerLogPayloadKeys.EVENT_ID to eventId,
+                            WorkerLogPayloadKeys.REASON to e.message
+                        )
+                    )
+                    val updated = updateStatusSafely(rawId, eventId, "RETRYABLE") {
                         statusUpdater.updateToFailedRetryable(rawId, e.message ?: "Transient error")
                     }
+                    return toResult(updated, e.message ?: "Transient error")
                 }
             else -> {
-                log.error(
-                    "[Settlement] [CRITICAL] 예상치 못한 시스템 오류 발생. 즉시 확인 필요. eventId={}, error={}",
-                    eventId, e.message, e
+                structuredLogger.error(
+                    logType = LogType.TECHNICAL,
+                    result = LogResult.FAIL,
+                    payload = mapOf(
+                        WorkerLogPayloadKeys.PHASE to "unexpected_system_error",
+                        WorkerLogPayloadKeys.EVENT_ID to eventId,
+                        WorkerLogPayloadKeys.RAW_ID to rawId,
+                        WorkerLogPayloadKeys.ERROR to e.message
+                    ),
+                    error = e
                 )
                 updateStatusSafely(rawId, eventId, "NON_RETRYABLE") {
                     statusUpdater.updateToFailedNonRetryable(rawId, "Unexpected System Error: ${e.message}")
                 }
+                return RecordSettlementResult.NonRetryableFailed("Unexpected System Error: ${e.message}")
             }
         }
     }
 
-    private inline fun updateStatusSafely(rawId: Long, eventId: String, statusLabel: String, update: () -> Unit) {
-        try {
-            update()
-        } catch (e: Exception) {
-            log.error(
-                "[Settlement] 상태 업데이트 실패({}). 내부 재처리 체계 이탈 가능성. DLQ 확인 필요. eventId={}, rawId={}",
-                statusLabel, eventId, rawId, e
+    private fun toResult(updated: SettlementRawData?, reason: String): RecordSettlementResult {
+        if (updated == null) {
+            return RecordSettlementResult.NonRetryableFailed("STATUS_UPDATE_FAILED: $reason")
+        }
+
+        return when (updated.status) {
+            RawDataStatus.FAILED_NON_RETRYABLE -> RecordSettlementResult.NonRetryableFailed(updated.failureReason ?: reason)
+            RawDataStatus.PENDING_DEPENDENCY,
+            RawDataStatus.FAILED_RETRYABLE,
+                -> RecordSettlementResult.RetryScheduled(
+                    reason = updated.failureReason ?: reason,
+                    retryCount = updated.retryCount,
+                    nextRetryAt = updated.nextRetryAt
+                )
+
+            else -> RecordSettlementResult.RetryScheduled(
+                reason = updated.failureReason ?: reason,
+                retryCount = updated.retryCount,
+                nextRetryAt = updated.nextRetryAt
             )
+        }
+    }
+
+    private inline fun updateStatusSafely(
+        rawId: Long,
+        eventId: String,
+        statusLabel: String,
+        update: () -> SettlementRawData?
+    ): SettlementRawData? {
+        try {
+            return update()
+        } catch (e: Exception) {
+            structuredLogger.error(
+                logType = LogType.TECHNICAL,
+                result = LogResult.FAIL,
+                payload = mapOf(
+                    WorkerLogPayloadKeys.PHASE to "status_update_failure",
+                    WorkerLogPayloadKeys.STATUS_LABEL to statusLabel,
+                    WorkerLogPayloadKeys.EVENT_ID to eventId,
+                    WorkerLogPayloadKeys.RAW_ID to rawId
+                ),
+                error = e
+            )
+            return null
         }
     }
 }

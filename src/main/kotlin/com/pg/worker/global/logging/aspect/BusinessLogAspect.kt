@@ -10,6 +10,7 @@ import com.pg.worker.global.logging.MDC_REDELIVERED
 import com.pg.worker.global.logging.MDC_RETRY_COUNT
 import com.pg.worker.global.logging.MDC_TOPIC
 import com.pg.worker.global.logging.MDC_TRACE_ID
+import com.pg.worker.global.logging.WorkerLogPayloadKeys
 import com.pg.worker.global.logging.annotation.BusinessLog
 import com.pg.worker.global.logging.context.LogContextHolder
 import com.pg.worker.global.logging.support.ErrorClassifier
@@ -112,14 +113,14 @@ class BusinessLogAspect(
             "durationMs" to durationMs,
             "startedAt" to startedAt.toString(),
             "finishedAt" to finishedAt.toString(),
-            "traceId" to MDC.get(MDC_TRACE_ID),
+            WorkerLogPayloadKeys.TRACE_ID to MDC.get(MDC_TRACE_ID),
             "orderFlowId" to MDC.get(MDC_ORDER_FLOW_ID),
-            "eventType" to MDC.get(MDC_EVENT_TYPE),
-            "messageId" to MDC.get(MDC_MESSAGE_ID),
+            WorkerLogPayloadKeys.EVENT_TYPE to MDC.get(MDC_EVENT_TYPE),
+            WorkerLogPayloadKeys.MESSAGE_ID to MDC.get(MDC_MESSAGE_ID),
             "queue" to MDC.get(MDC_QUEUE),
             "topic" to MDC.get(MDC_TOPIC),
             "consumer" to MDC.get(MDC_CONSUMER),
-            "retryCount" to MDC.get(MDC_RETRY_COUNT),
+            WorkerLogPayloadKeys.RETRY_COUNT to MDC.get(MDC_RETRY_COUNT),
             "redelivered" to MDC.get(MDC_REDELIVERED),
         )
 
