@@ -3,6 +3,7 @@ package com.pg.worker.settlement.consumer
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import com.gop.logging.contract.StructuredLogger
 import org.junit.jupiter.api.Test
 import software.amazon.awssdk.services.sqs.SqsClient
 import software.amazon.awssdk.services.sqs.model.DeleteMessageRequest
@@ -17,12 +18,14 @@ class SettlementDispatchSqsConsumerTest {
     private val sqsClient = mockk<SqsClient>()
     private val handler = mockk<SettlementDispatchMessageHandler>()
     private val dlqPublisher = mockk<SettlementDispatchDlqPublisher>()
+    private val structuredLogger = mockk<StructuredLogger>(relaxed = true)
     private val queueUrl = "https://sqs.ap-northeast-2.amazonaws.com/111111111111/main-queue"
 
     private val consumer = SettlementDispatchSqsConsumer(
         sqsClient = sqsClient,
         handler = handler,
         dlqPublisher = dlqPublisher,
+        structuredLogger = structuredLogger,
         queueUrl = queueUrl,
         maxMessages = 1,
         waitTimeSeconds = 0,

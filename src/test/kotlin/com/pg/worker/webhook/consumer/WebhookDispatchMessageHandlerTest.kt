@@ -1,6 +1,7 @@
 package com.pg.worker.webhook.consumer
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.gop.logging.contract.StructuredLogger
 import com.pg.worker.webhook.application.usecase.repository.WebhookDeliveryStateRepository
 import com.pg.worker.webhook.application.usecase.repository.WebhookEndpointReadRepository
 import com.pg.worker.webhook.infra.messaging.consumer.WebhookDispatchMessageHandler
@@ -19,11 +20,13 @@ class WebhookDispatchMessageHandlerTest {
     private val objectMapper = jacksonObjectMapper()
     private val deliveryRepository = mockk<WebhookDeliveryStateRepository>(relaxed = true)
     private val endpointRepository = mockk<WebhookEndpointReadRepository>()
+    private val structuredLogger = mockk<StructuredLogger>(relaxed = true)
 
     private val handler = WebhookDispatchMessageHandler(
         objectMapper = objectMapper,
         deliveryRepository = deliveryRepository,
         endpointRepository = endpointRepository,
+        structuredLogger = structuredLogger,
     )
 
     @Test

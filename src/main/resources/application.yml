@@ -1,3 +1,5 @@
+LOG_SERVICE_NAME: ${LOG_SERVICE_NAME}
+
 spring:
   config:
     import: optional:file:.env[.properties]
