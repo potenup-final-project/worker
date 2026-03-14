@@ -1,13 +1,13 @@
 package com.pg.worker.settlement.consumer
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.gop.logging.contract.StructuredLogger
 import com.pg.worker.settlement.application.usecase.command.RecordSettlementCommandUseCase
 import com.pg.worker.settlement.application.usecase.command.dto.RecordSettlementCommand
+import com.pg.worker.settlement.application.usecase.command.dto.RecordSettlementResult
 import com.pg.worker.settlement.consumer.dto.SettlementDispatchMessage
 import io.mockk.every
-import io.mockk.just
 import io.mockk.mockk
-import io.mockk.runs
 import io.mockk.slot
 import io.mockk.verify
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -18,16 +18,18 @@ class SettlementDispatchMessageHandlerTest {
 
     private val objectMapper = jacksonObjectMapper()
     private val useCase = mockk<RecordSettlementCommandUseCase>()
+    private val structuredLogger = mockk<StructuredLogger>(relaxed = true)
 
     private val handler = SettlementDispatchMessageHandler(
         objectMapper = objectMapper,
         recordSettlementCommandUseCase = useCase,
+        structuredLogger = structuredLogger,
     )
 
     @Test
     fun `유효한 메시지를 처리하면 성공 결과를 반환한다`() {
         val commandSlot = slot<RecordSettlementCommand>()
-        every { useCase.record(any()) } just runs
+        every { useCase.record(any()) } returns RecordSettlementResult.Success
 
         val envelope = SettlementDispatchMessage(
             messageId = "msg-1",
@@ -58,8 +60,12 @@ class SettlementDispatchMessageHandlerTest {
     }
 
     @Test
-    fun `비즈니스 처리 예외는 retryable 실패를 반환한다`() {
-        every { useCase.record(any()) } throws RuntimeException("db down")
+    fun `비즈니스 처리 재시도 예약 결과는 성공 ack를 반환한다`() {
+        every { useCase.record(any()) } returns RecordSettlementResult.RetryScheduled(
+            reason = "db down",
+            retryCount = 1,
+            nextRetryAt = null
+        )
 
         val envelope = SettlementDispatchMessage(
             messageId = "msg-2",
@@ -74,7 +80,7 @@ class SettlementDispatchMessageHandlerTest {
         val result = handler.handle(objectMapper.writeValueAsString(envelope))
 
         assertEquals(
-            SettlementDispatchHandleResult.RetryableFailure("BUSINESS_PROCESSING_FAILED"),
+            SettlementDispatchHandleResult.Success,
             result,
         )
         verify(exactly = 1) { useCase.record(any()) }
@@ -99,5 +105,28 @@ class SettlementDispatchMessageHandlerTest {
             result,
         )
         verify(exactly = 0) { useCase.record(any()) }
+    }
+
+    @Test
+    fun `비즈니스 non-retryable 결과는 non-retryable 실패를 반환한다`() {
+        every { useCase.record(any()) } returns RecordSettlementResult.NonRetryableFailed("POLICY_NOT_FOUND")
+
+        val envelope = SettlementDispatchMessage(
+            messageId = "msg-4",
+            occurredAt = "2026-03-13T00:00:00",
+            eventType = "SETTLEMENT_RECORD",
+            eventId = UUID.randomUUID(),
+            merchantId = 13L,
+            aggregateId = 23L,
+            payload = "{\"paymentKey\":\"pay-4\",\"transactionId\":4,\"orderId\":\"ord-4\",\"providerTxId\":\"ptx-4\",\"transactionType\":\"PAYMENT\",\"amount\":4000}",
+        )
+
+        val result = handler.handle(objectMapper.writeValueAsString(envelope))
+
+        assertEquals(
+            SettlementDispatchHandleResult.NonRetryableFailure("POLICY_NOT_FOUND"),
+            result,
+        )
+        verify(exactly = 1) { useCase.record(any()) }
     }
 }
