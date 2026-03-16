@@ -1,47 +1,80 @@
 package com.pg.worker.settlement.application.service
 
+import com.gop.logging.contract.LogPrefix
+import com.gop.logging.contract.LogResult
+import com.gop.logging.contract.LogSuffix
+import com.gop.logging.contract.LogType
+import com.gop.logging.contract.ProcessResult
+import com.gop.logging.contract.StepPrefix
+import com.gop.logging.contract.StructuredLogger
 import com.pg.worker.settlement.domain.exception.NonRetryableException
 import com.pg.worker.settlement.domain.exception.PendingDependencyException
 import com.pg.worker.settlement.domain.exception.RetryableException
 import com.pg.worker.settlement.domain.exception.SettlementException
-import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 
 @Service
+@LogPrefix(StepPrefix.SETTLEMENT_RETRY)
 class SettlementRetryProcessor(
     private val ledgerProcessor: SettlementLedgerProcessor,
-    private val statusUpdater: SettlementStatusUpdater
+    private val statusUpdater: SettlementStatusUpdater,
+    private val structuredLogger: StructuredLogger,
 ) {
-    private val log = LoggerFactory.getLogger(javaClass)
 
-    /**
-     * 개별 Raw 데이터 재처리 (Individual Transaction per Row)
-     */
+    @LogSuffix("processRetry")
     fun processRetry(rawId: Long) {
+        structuredLogger.info(
+            logType = LogType.FLOW,
+            result = LogResult.START,
+            payload = mapOf("rawId" to rawId)
+        )
+
+        val startMs = System.currentTimeMillis()
         try {
-            log.info("[정산-재처리] 재처리 시작. rawId={}", rawId)
-            
             ledgerProcessor.process(rawId)
-            
-            log.info("[정산-재처리] 재처리 완료. rawId={}", rawId)
-            
+
+            structuredLogger.info(
+                logType = LogType.FLOW,
+                result = LogResult.END,
+                payload = mapOf("processResult" to ProcessResult.SUCCESS.name, "rawId" to rawId, "durationMs" to (System.currentTimeMillis() - startMs))
+            )
         } catch (e: SettlementException) {
             when (e) {
                 is PendingDependencyException -> {
-                    log.info("[정산-재처리] 의존성 미충족 대기 (재시도). rawId={}, reason={}", rawId, e.message)
+                    structuredLogger.info(
+                        logType = LogType.FLOW,
+                        result = LogResult.END,
+                        payload = mapOf("processResult" to ProcessResult.RETRY.name, "rawId" to rawId, "reason" to "pending_dependency", "durationMs" to (System.currentTimeMillis() - startMs)),
+                        error = e
+                    )
                     statusUpdater.updateToPending(rawId, e.message ?: "Dependency missing")
                 }
                 is NonRetryableException -> {
-                    log.error("[정산-재처리] 비즈니스 오류 (영구 실패). rawId={}, reason={}", rawId, e.message)
+                    structuredLogger.error(
+                        logType = LogType.FLOW,
+                        result = LogResult.END,
+                        payload = mapOf("processResult" to ProcessResult.FAIL.name, "rawId" to rawId, "reason" to "non_retryable", "durationMs" to (System.currentTimeMillis() - startMs)),
+                        error = e
+                    )
                     statusUpdater.updateToFailedNonRetryable(rawId, e.message ?: "Non-retryable error")
                 }
                 is RetryableException -> {
-                    log.warn("[정산-재처리] 기술적 일시 오류 (재시도 예약). rawId={}, reason={}", rawId, e.message)
+                    structuredLogger.warn(
+                        logType = LogType.FLOW,
+                        result = LogResult.END,
+                        payload = mapOf("processResult" to ProcessResult.RETRY.name, "rawId" to rawId, "reason" to "retryable_error", "durationMs" to (System.currentTimeMillis() - startMs)),
+                        error = e
+                    )
                     statusUpdater.updateToFailedRetryable(rawId, e.message ?: "Transient error")
                 }
             }
         } catch (e: Exception) {
-            log.error("[정산-재처리] 예상치 못한 시스템 오류 (재시도 예약). rawId={}, error={}", rawId, e.message, e)
+            structuredLogger.error(
+                logType = LogType.FLOW,
+                result = LogResult.END,
+                payload = mapOf("processResult" to ProcessResult.RETRY.name, "rawId" to rawId, "reason" to "unexpected_error", "durationMs" to (System.currentTimeMillis() - startMs)),
+                error = e
+            )
             statusUpdater.updateToFailedRetryable(rawId, "Unexpected System Error: ${e.message}")
         }
     }
