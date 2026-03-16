@@ -10,6 +10,7 @@ import com.pg.worker.webhook.domain.WebhookDeliveryStatus
 import com.pg.worker.webhook.domain.WebhookEndpoint
 import com.pg.worker.webhook.util.SecretEncryptor
 import com.pg.worker.webhook.util.WebhookMetrics
+import com.gop.logging.contract.StructuredLogger
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
@@ -29,6 +30,7 @@ class SendWebhookServiceTest {
     private val limiter = mockk<EndpointConcurrencyLimiter>()
     private val endpointRepository = mockk<WebhookEndpointReadRepository>()
     private val deliveryRepository = mockk<WebhookDeliveryStateRepository>(relaxed = true)
+    private val structuredLogger = mockk<StructuredLogger>(relaxed = true)
 
     private fun service(maxAttempts: Int = 2): SendWebhookService {
         return SendWebhookService(
@@ -38,6 +40,7 @@ class SendWebhookServiceTest {
             concurrencyLimiter = limiter,
             endpointRepository = endpointRepository,
             deliveryStateRepository = deliveryRepository,
+            structuredLogger = structuredLogger,
             maxAttempts = maxAttempts,
             sendThreads = 1,
             allowPlaintextFallback = false,

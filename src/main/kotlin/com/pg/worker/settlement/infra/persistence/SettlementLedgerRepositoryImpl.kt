@@ -54,14 +54,6 @@ class SettlementLedgerRepositoryImpl(
             .fetch()
     }
 
-    override fun findLatestByTransactionId(transactionId: Long): SettlementLedger? {
-        return queryFactory
-            .selectFrom(qLedger)
-            .where(qLedger.transactionId.eq(transactionId))
-            .orderBy(qLedger.id.desc())
-            .fetchFirst()
-    }
-
     override fun findAllByTransactionIdIn(transactionIds: List<Long>): List<SettlementLedger> {
         return jpaRepository.findAllByTransactionIdIn(transactionIds)
     }

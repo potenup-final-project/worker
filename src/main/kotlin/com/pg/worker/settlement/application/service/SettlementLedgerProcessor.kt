@@ -10,7 +10,13 @@ import com.pg.worker.settlement.domain.TransactionType
 import com.pg.worker.settlement.domain.exception.NonRetryableException
 import com.pg.worker.settlement.domain.exception.PendingDependencyException
 import com.pg.worker.settlement.domain.exception.RetryableException
-import org.slf4j.LoggerFactory
+import com.gop.logging.contract.LogPrefix
+import com.gop.logging.contract.LogResult
+import com.gop.logging.contract.LogSuffix
+import com.gop.logging.contract.LogType
+import com.gop.logging.contract.ProcessResult
+import com.gop.logging.contract.StepPrefix
+import com.gop.logging.contract.StructuredLogger
 import org.springframework.dao.ConcurrencyFailureException
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.dao.DuplicateKeyException
@@ -23,16 +29,18 @@ import java.math.BigDecimal
 import java.math.RoundingMode
 
 @Component
+@LogPrefix(StepPrefix.SETTLEMENT_LEDGER)
 class SettlementLedgerProcessor(
     private val rawRepository: SettlementRawDataRepository,
     private val ledgerRepository: SettlementLedgerRepository,
-    private val policyRepository: SettlementPolicyRepository
+    private val policyRepository: SettlementPolicyRepository,
+    private val structuredLogger: StructuredLogger,
 ) {
-    private val log = LoggerFactory.getLogger(javaClass)
 
     // 카드사 원가 수수료율 고정 (테스트용 2.1%)
     private val HOST_FEE_RATE = BigDecimal("0.021")
 
+    @LogSuffix("process")
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     fun process(rawId: Long) {
         val raw = loadRaw(rawId) ?: return
@@ -65,9 +73,10 @@ class SettlementLedgerProcessor(
 
     private fun loadRaw(rawId: Long): SettlementRawData? {
         return rawRepository.findById(rawId) ?: run {
-            log.warn(
-                "[Settlement] [Processor] 처리를 위한 Raw 데이터가 존재하지 않습니다. rawId={} (원인: 잘못된 ID 전달 또는 DB 복제 지연 등)",
-                rawId
+            structuredLogger.warn(
+                logType = LogType.FLOW,
+                result = LogResult.SKIP,
+                payload = mapOf("reason" to "raw_data_not_found", "rawId" to rawId)
             )
             null
         }
@@ -75,7 +84,13 @@ class SettlementLedgerProcessor(
 
     private fun isAlreadyProcessed(raw: SettlementRawData): Boolean {
         val exists = ledgerRepository.findByRawEventId(raw.eventId) != null
-        if (exists) log.info("[Settlement] [Idempotent] 이미 처리된 Ledger가 존재합니다. eventId={}", raw.eventId)
+        if (exists) {
+            structuredLogger.info(
+                logType = LogType.FLOW,
+                result = LogResult.SKIP,
+                payload = mapOf("reason" to "already_processed", "eventId" to raw.eventId)
+            )
+        }
         return exists
     }
 
@@ -194,7 +209,11 @@ class SettlementLedgerProcessor(
 
     private fun handleDataIntegrityViolation(raw: SettlementRawData, e: DataIntegrityViolationException) {
         if (ledgerRepository.findByRawEventId(raw.eventId) != null) {
-            log.info("[Settlement] [Idempotent] 동시성 충돌 후 Ledger 존재 확인(멱등 성공). eventId={}", raw.eventId)
+            structuredLogger.info(
+                logType = LogType.FLOW,
+                result = LogResult.SKIP,
+                payload = mapOf("reason" to "idempotent_after_conflict", "eventId" to raw.eventId)
+            )
             return
         }
 

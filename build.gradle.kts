@@ -128,6 +128,7 @@ dependencies {
 
     // --- gop logging lib ---
     implementation("com.gop.logging:gop-logging-contract:$gopLoggingVersion")
+    implementation("com.gop.logging:gop-logging-core:$gopLoggingVersion")
     implementation("com.gop.logging:gop-logging-spring:$gopLoggingVersion")
 }
 

@@ -85,7 +85,11 @@ class SettlementDispatchSqsConsumerTest {
     }
 
     private fun stubReceiveSingleMessage(body: String, receiptHandle: String) {
-        val message = Message.builder().body(body).receiptHandle(receiptHandle).build()
+        val message = Message.builder()
+            .messageId("msg-$receiptHandle")
+            .body(body)
+            .receiptHandle(receiptHandle)
+            .build()
         every { sqsClient.receiveMessage(any<Consumer<ReceiveMessageRequest.Builder>>()) } returns
             ReceiveMessageResponse.builder().messages(listOf(message)).build()
     }
