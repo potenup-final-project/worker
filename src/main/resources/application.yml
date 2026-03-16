@@ -1,6 +1,8 @@
 LOG_SERVICE_NAME: ${LOG_SERVICE_NAME}
 
 spring:
+  main:
+    banner-mode: ${SPRING_BANNER_MODE}
   config:
     import: optional:file:.env[.properties]
   datasource:
@@ -134,5 +136,6 @@ logging:
   pattern:
     level: "%5p [traceId:%X{traceId} messageId:%X{messageId} eventId:%X{eventId} deliveryId:%X{deliveryId}]"
     slow-threshold-ms: ${APP_LOGGING_SLOW_THRESHOLD_MS}
-
-
+  level:
+    root: ${APP_ROOT_LOG_LEVEL}
+    com.gop.logging.core.StructuredLoggerImpl: ${LOG_MIN_LEVEL}
