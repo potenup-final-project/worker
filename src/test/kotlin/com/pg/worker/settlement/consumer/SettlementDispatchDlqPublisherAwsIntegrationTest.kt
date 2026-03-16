@@ -12,7 +12,6 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Test
 import software.amazon.awssdk.services.sqs.SqsClient
-import software.amazon.awssdk.services.sqs.model.ChangeMessageVisibilityRequest
 import software.amazon.awssdk.services.sqs.model.Message
 import software.amazon.awssdk.services.sqs.model.MessageSystemAttributeName
 import software.amazon.awssdk.services.sqs.model.QueueAttributeName
@@ -29,10 +28,15 @@ class SettlementDispatchDlqPublisherAwsIntegrationTest {
 
     @BeforeEach
     fun setup() {
-        dlqUrl = AwsTestEnv.get("SETTLEMENT_SQS_DLQ_URL") ?: ""
-        sourceQueueUrl = AwsTestEnv.get("SETTLEMENT_SQS_QUEUE_URL") ?: "integration-test-source"
+        dlqUrl = AwsTestEnv.get("AWS_TEST_SETTLEMENT_DLQ_URL")
+            ?: AwsTestEnv.get("SETTLEMENT_SQS_DLQ_URL")
+            ?: ""
+        sourceQueueUrl = AwsTestEnv.get("AWS_TEST_SETTLEMENT_QUEUE_URL")
+            ?: AwsTestEnv.get("SETTLEMENT_SQS_QUEUE_URL")
+            ?: ""
 
         assumeTrue(dlqUrl.isNotBlank(), "SETTLEMENT_SQS_DLQ_URL required")
+        assumeTrue(sourceQueueUrl.isNotBlank(), "SETTLEMENT_SQS_QUEUE_URL required")
 
         sqsClient = AwsTestEnv.createSqsClient()
         verifyQueueAccessible(dlqUrl)
@@ -107,14 +111,6 @@ class SettlementDispatchDlqPublisherAwsIntegrationTest {
                 if (message.body().contains(marker)) {
                     return message
                 }
-
-                sqsClient.changeMessageVisibility(
-                    ChangeMessageVisibilityRequest.builder()
-                        .queueUrl(dlqUrl)
-                        .receiptHandle(message.receiptHandle())
-                        .visibilityTimeout(0)
-                        .build()
-                )
             }
         }
 

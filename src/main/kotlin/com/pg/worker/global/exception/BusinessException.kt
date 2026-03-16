@@ -1,5 +1,6 @@
 package com.pg.worker.global.exception
 
+import com.gop.logging.contract.CodedError
 import org.springframework.http.HttpStatus
 
 open class BusinessException(
@@ -7,7 +8,10 @@ open class BusinessException(
     override val httpStatus: HttpStatus,
     override val message: String,
     cause: Throwable? = null
-) : RuntimeException(message, cause), ErrorCode {
+) : RuntimeException(message, cause), ErrorCode, CodedError {
+
+    override val errorCode: String get() = code
+
     constructor(
         errorCode: ErrorCode,
         messageMapper: ((String) -> String)? = null,

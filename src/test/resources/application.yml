@@ -14,9 +14,132 @@ spring:
       port: 6379
       password: ""
 
+  h2:
+    console:
+      enabled: true
+
+  cloud:
+    aws:
+      region:
+        static: ${AWS_REGION}
+      credentials:
+        access-key: ${AWS_ACCESS_KEY_ID:}
+        secret-key: ${AWS_SECRET_ACCESS_KEY:}
+      sqs:
+        endpoint: ${AWS_SQS_ENDPOINT:}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+
+  endpoint:
+    health:
+      show-details: always
+
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+
+  metrics:
+    tags:
+      application: pg-worker
+      env: prod
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+        http.client.requests: true
+      slo:
+        http.server.requests: 100ms, 300ms, 500ms, 1s, 3s
+
+webhook:
+  recon:
+    enabled: ${WEBHOOK_RECON_ENABLED}
+    chunk-size: ${WEBHOOK_RECON_CHUNK_SIZE}
+    max-pages: ${WEBHOOK_RECON_MAX_PAGES}
+    stale-grace-minutes: ${WEBHOOK_RECON_STALE_GRACE_MINUTES}
+    stale-age-hours: ${WEBHOOK_RECON_STALE_AGE_HOURS}
+    degraded-window-days: ${WEBHOOK_RECON_DEGRADED_WINDOW_DAYS}
+    degraded-min-sample: ${WEBHOOK_RECON_DEGRADED_MIN_SAMPLE}
+    degraded-dead-rate: ${WEBHOOK_RECON_DEGRADED_DEAD_RATE}
+    degraded-recovery-window-days: ${WEBHOOK_RECON_DEGRADED_RECOVERY_WINDOW_DAYS}
+    missing-grace-minutes: ${WEBHOOK_RECON_MISSING_GRACE_MINUTES}
+    lookback-days: ${WEBHOOK_RECON_LOOKBACK_DAYS}
+    auto-ddl: ${WEBHOOK_RECON_AUTO_DDL}
+  sqs:
+    enabled: ${WEBHOOK_SQS_ENABLED}
+    queue-url: ${WEBHOOK_SQS_QUEUE_URL}
+    poll-interval-ms: ${WEBHOOK_SQS_POLL_INTERVAL_MS}
+    max-messages: ${WEBHOOK_SQS_MAX_MESSAGES}
+    wait-time-seconds: ${WEBHOOK_SQS_WAIT_SECONDS}
+    visibility-timeout-seconds: ${WEBHOOK_SQS_VISIBILITY_TIMEOUT_SECONDS}
+  limiter:
+    type: redis
+    redis:
+      max-permits: ${WEBHOOK_LIMITER_REDIS_MAX_PERMITS}
+      permit-ttl-ms: ${WEBHOOK_LIMITER_REDIS_PERMIT_TTL_MS}
+      fail-open: ${WEBHOOK_LIMITER_REDIS_FAIL_OPEN}
+  worker:
+    batch-size: ${WORKER_BATCH_SIZE}
+    interval-ms: ${WORKER_INTERVAL_MS}
+    max-attempts: ${WORKER_MAX_ATTEMPTS}
+    concurrency-per-endpoint: ${WORKER_CONCURRENCY_ENDPOINT}
+    send-threads: ${WORKER_SEND_THREAD}
+  lease:
+    minutes: ${LEASE_MINUTES}
+    sweep-interval-ms: ${SWEEP_INTERVAL_MS}
+  http:
+    connect-timeout-ms: ${HTTP_CONN_TIMEOUT}
+    read-timeout-ms: ${HTTP_READ_TIMEOUT}
+  secret:
+    encryption-key: ${WEBHOOK_SECRET_KEY}
+    allow-plaintext-fallback: ${WEBHOOK_ALLOW_PLAINTEXT}
+  endpoint:
+    require-https: ${WEBHOOK_REQUIRE_HTTPS}
+
+settlement:
+  sqs:
+    enabled: ${SETTLEMENT_SQS_ENABLED}
+    queue-url: ${SETTLEMENT_SQS_QUEUE_URL}
+    dlq-url: ${SETTLEMENT_SQS_DLQ_URL:https://sqs.ap-northeast-2.amazonaws.com/459742122195/gop-worker-queue-dlq}
+    poll-interval-ms: ${SETTLEMENT_SQS_POLL_INTERVAL_MS}
+    max-messages: ${SETTLEMENT_SQS_MAX_MESSAGES}
+    wait-time-seconds: ${SETTLEMENT_SQS_WAIT_SECONDS}
+    visibility-timeout-seconds: ${SETTLEMENT_SQS_VISIBILITY_TIMEOUT_SECONDS}
+
+server:
+  port: ${SERVER_PORT}
+
+aws:
+  region: ${AWS_REGION}
+  access-key-id: ${AWS_ACCESS_KEY_ID:}
+  secret-access-key: ${AWS_SECRET_ACCESS_KEY:}
+  sqs:
+    endpoint: ${AWS_SQS_ENDPOINT:}
+
+pgcore:
+  read-datasource:
+    url: ${PGCORE_READ_DB_URL}
+    username: ${PGCORE_READ_DB_USER}
+    password: ${PGCORE_READ_DB_PASSWORD}
+    driver-class-name: ${PGCORE_READ_DB_DRIVER}
+
+logging:
+  pattern:
+    level: "%5p [traceId:%X{traceId} messageId:%X{messageId} eventId:%X{eventId} deliveryId:%X{deliveryId}]"
+    slow-threshold-ms: ${APP_LOGGING_SLOW_THRESHOLD_MS}
+
+
+
+
+LOG_SERVICE_NAME: worker
+
 DB_URL: jdbc:h2:mem:worker-test;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
 DB_USER: sa
-DB_PASSWORD: ""
+DB_PASSWORD: test
+DB_DDL_AUTO: create-drop
 AWS_REGION: ap-northeast-2
 WORKER_BATCH_SIZE: 10
 WORKER_INTERVAL_MS: 1000
@@ -43,3 +166,29 @@ WEBHOOK_SQS_MAX_MESSAGES: 10
 WEBHOOK_SQS_WAIT_SECONDS: 1
 WEBHOOK_SQS_VISIBILITY_TIMEOUT_SECONDS: 30
 WEBHOOK_RECON_ENABLED: false
+WEBHOOK_RECON_CHUNK_SIZE: 100
+WEBHOOK_RECON_MAX_PAGES: 10
+WEBHOOK_RECON_STALE_GRACE_MINUTES: 5
+WEBHOOK_RECON_STALE_AGE_HOURS: 24
+WEBHOOK_RECON_DEGRADED_WINDOW_DAYS: 7
+WEBHOOK_RECON_DEGRADED_MIN_SAMPLE: 10
+WEBHOOK_RECON_DEGRADED_DEAD_RATE: 0.3
+WEBHOOK_RECON_DEGRADED_RECOVERY_WINDOW_DAYS: 3
+WEBHOOK_RECON_MISSING_GRACE_MINUTES: 10
+WEBHOOK_RECON_LOOKBACK_DAYS: 7
+WEBHOOK_RECON_AUTO_DDL: false
+
+SETTLEMENT_SQS_ENABLED: false
+SETTLEMENT_SQS_QUEUE_URL: https://example.com/settlement-queue
+SETTLEMENT_SQS_POLL_INTERVAL_MS: 1000
+SETTLEMENT_SQS_MAX_MESSAGES: 10
+SETTLEMENT_SQS_WAIT_SECONDS: 1
+SETTLEMENT_SQS_VISIBILITY_TIMEOUT_SECONDS: 30
+
+SERVER_PORT: 0
+APP_LOGGING_SLOW_THRESHOLD_MS: 500
+
+PGCORE_READ_DB_URL: jdbc:h2:mem:worker-test-read;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+PGCORE_READ_DB_USER: sa
+PGCORE_READ_DB_PASSWORD: test
+PGCORE_READ_DB_DRIVER: org.h2.Driver
