@@ -6,7 +6,7 @@ import com.pg.worker.settlement.application.repository.SettlementLedgerRepositor
 import com.pg.worker.settlement.domain.SettlementAggregate
 import com.pg.worker.settlement.domain.SettlementAggregateItem
 import com.pg.worker.settlement.domain.TransactionType
-import org.slf4j.LoggerFactory
+import com.gop.logging.contract.StructuredLogger
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation
@@ -17,9 +17,8 @@ import java.time.LocalDate
 class SettlementAggregationService(
     private val ledgerRepository: SettlementLedgerRepository,
     private val aggregateRepository: SettlementAggregateRepository,
-    private val aggregateItemRepository: SettlementAggregateItemRepository
-) {
-    private val log = LoggerFactory.getLogger(javaClass)
+    private val aggregateItemRepository: SettlementAggregateItemRepository,
+    private val log: StructuredLogger) {
 
     /**
      * 특정 가맹점의 특정 일자 정산 집계

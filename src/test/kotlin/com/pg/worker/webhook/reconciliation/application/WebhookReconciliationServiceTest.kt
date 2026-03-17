@@ -10,6 +10,7 @@ import com.pg.worker.webhook.domain.WebhookDeliveryStatus
 import com.pg.worker.webhook.reconciliation.infra.PgCoreOutboxReadRepository
 import com.pg.worker.webhook.reconciliation.infra.WebhookDeliveryReconciliationReader
 import com.pg.worker.webhook.reconciliation.infra.WebhookReconciliationResultStore
+import com.gop.logging.contract.StructuredLogger
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import io.mockk.every
 import io.mockk.mockk
@@ -32,6 +33,7 @@ class WebhookReconciliationServiceTest {
     private val outboxReadRepository = mockk<PgCoreOutboxReadRepository>()
     private val meterRegistry = SimpleMeterRegistry()
     private val fixedClock = Clock.fixed(Instant.parse("2026-03-10T10:00:00Z"), ZoneOffset.UTC)
+    private val log = mockk<StructuredLogger>(relaxed = true)
 
     private val props = WebhookReconciliationProperties(
         enabled = true,
@@ -56,6 +58,7 @@ class WebhookReconciliationServiceTest {
         meterRegistry = meterRegistry,
         props = props,
         clock = fixedClock,
+        log = log,
     )
 
     @Test

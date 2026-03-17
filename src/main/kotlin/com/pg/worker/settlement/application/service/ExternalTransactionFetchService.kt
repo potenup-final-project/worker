@@ -3,7 +3,7 @@ package com.pg.worker.settlement.application.service
 import com.pg.worker.settlement.application.repository.ExternalSettlementClient
 import com.pg.worker.settlement.application.repository.ExternalSettlementDetailRepository
 import com.pg.worker.settlement.domain.ExternalSettlementDetail
-import org.slf4j.LoggerFactory
+import com.gop.logging.contract.StructuredLogger
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
@@ -14,9 +14,8 @@ import java.time.LocalDate
 @Service
 class ExternalTransactionFetchService(
     private val externalClient: ExternalSettlementClient,
-    private val externalRepository: ExternalSettlementDetailRepository
-) {
-    private val log = LoggerFactory.getLogger(javaClass)
+    private val externalRepository: ExternalSettlementDetailRepository,
+    private val log: StructuredLogger) {
 
     /**
      * 특정 날짜의 외부 데이터를 수집하여 DB에 저장 (동기화)

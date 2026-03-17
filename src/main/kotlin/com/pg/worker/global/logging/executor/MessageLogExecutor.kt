@@ -5,15 +5,14 @@ import com.pg.worker.global.logging.support.LogSanitizer
 import com.pg.worker.global.logging.context.WorkerExecutionResult
 import com.pg.worker.global.logging.context.WorkerMessageContext
 import com.pg.worker.global.logging.context.WorkerResult
-import org.slf4j.LoggerFactory
+import com.gop.logging.contract.StructuredLogger
 import org.slf4j.MDC
 import org.springframework.stereotype.Component
 
 @Component
 class MessageLogExecutor(
     private val objectMapper: ObjectMapper,
-) {
-    private val log = LoggerFactory.getLogger(MessageLogExecutor::class.java)
+    private val log: StructuredLogger) {
 
     fun <T> execute(
         context: WorkerMessageContext,

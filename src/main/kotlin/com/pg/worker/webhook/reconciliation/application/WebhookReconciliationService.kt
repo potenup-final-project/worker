@@ -7,7 +7,7 @@ import com.pg.worker.webhook.reconciliation.infra.PgCoreOutboxReadRepository
 import com.pg.worker.webhook.reconciliation.infra.WebhookDeliveryReconciliationReader
 import com.pg.worker.webhook.reconciliation.infra.WebhookReconciliationResultStore
 import io.micrometer.core.instrument.MeterRegistry
-import org.slf4j.LoggerFactory
+import com.gop.logging.contract.StructuredLogger
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Service
 import java.time.Clock
@@ -25,8 +25,7 @@ class WebhookReconciliationService(
     private val meterRegistry: MeterRegistry,
     private val props: WebhookReconciliationProperties,
     private val clock: Clock = Clock.systemDefaultZone(),
-) {
-    private val log = LoggerFactory.getLogger(javaClass)
+    private val log: StructuredLogger) {
     private val openGaugeByType: Map<WebhookMismatchType, AtomicLong> = WebhookMismatchType.entries.associateWith { type ->
         AtomicLong(0L).also { ref ->
             meterRegistry.gauge("webhook.recon.open.count", listOf(io.micrometer.core.instrument.Tag.of("type", type.name)), ref)
