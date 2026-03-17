@@ -5,16 +5,15 @@ import com.pg.worker.settlement.domain.InternalReconciliationResult
 import com.pg.worker.settlement.domain.MismatchType
 import com.pg.worker.settlement.domain.PaymentTransaction
 import com.pg.worker.settlement.domain.ReconciliationStatus
-import org.slf4j.LoggerFactory
+import com.gop.logging.contract.StructuredLogger
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Component
 import java.time.LocalDate
 
 @Component
 class InternalReconciliationWriter(
-    private val repository: InternalReconciliationResultRepository
-) {
-    private val log = LoggerFactory.getLogger(javaClass)
+    private val repository: InternalReconciliationResultRepository,
+    private val log: StructuredLogger) {
 
     fun writeMismatch(
         tx: PaymentTransaction,

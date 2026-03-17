@@ -6,7 +6,7 @@ import com.pg.worker.settlement.application.repository.SettlementRawDataReposito
 import com.pg.worker.settlement.domain.ExternalSettlementDetail
 import com.pg.worker.settlement.domain.SettlementLedger
 import com.pg.worker.settlement.domain.SettlementReconciliationResultType
-import org.slf4j.LoggerFactory
+import com.gop.logging.contract.StructuredLogger
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
@@ -17,8 +17,7 @@ class SettlementReconciliationEngine(
     private val ledgerRepository: SettlementLedgerRepository,
     private val rawDataRepository: SettlementRawDataRepository,
     private val writer: SettlementReconciliationWriter,
-) {
-    private val log = LoggerFactory.getLogger(javaClass)
+    private val log: StructuredLogger) {
 
     private data class ReconciliationStats(
         var matched: Int = 0,

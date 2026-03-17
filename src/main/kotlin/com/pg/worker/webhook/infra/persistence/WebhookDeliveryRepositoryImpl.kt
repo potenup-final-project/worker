@@ -8,7 +8,7 @@ import com.pg.worker.webhook.domain.WebhookDeliveryStatus
 import com.querydsl.jpa.impl.JPAQueryFactory
 import jakarta.persistence.EntityManager
 import jakarta.persistence.LockModeType
-import org.slf4j.LoggerFactory
+import com.gop.logging.contract.StructuredLogger
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Propagation
@@ -23,9 +23,8 @@ class WebhookDeliveryRepositoryImpl(
     private val queryFactory: JPAQueryFactory,
     private val entityManager: EntityManager,
     private val jdbcTemplate: JdbcTemplate,
-) : WebhookDeliveryStateRepository {
+    private val log: StructuredLogger) : WebhookDeliveryStateRepository {
 
-    private val log = LoggerFactory.getLogger(javaClass)
     private val qDelivery = QWebhookDelivery.webhookDelivery
 
     // TX1 (REQUIRES_NEW): due delivery batch claim 후 IN_PROGRESS로 전이

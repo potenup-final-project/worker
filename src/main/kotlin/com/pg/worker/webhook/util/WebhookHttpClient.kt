@@ -2,7 +2,7 @@ package com.pg.worker.webhook.util
 
 import com.pg.worker.webhook.application.usecase.repository.WebhookSendClient
 import com.pg.worker.webhook.application.usecase.repository.dto.WebhookSendResult
-import org.slf4j.LoggerFactory
+import com.gop.logging.contract.StructuredLogger
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
 import java.io.IOException
@@ -20,8 +20,7 @@ class WebhookHttpClient(
     private val outboundUrlValidator: WebhookOutboundUrlValidator,
     @Value("\${webhook.http.connect-timeout-ms}") private val connectTimeoutMs: Long,
     @Value("\${webhook.http.read-timeout-ms}") private val readTimeoutMs: Long,
-) : WebhookSendClient {
-    private val log = LoggerFactory.getLogger(javaClass)
+    private val log: StructuredLogger) : WebhookSendClient {
 
     private val httpClient: HttpClient = HttpClient.newBuilder()
         .connectTimeout(Duration.ofMillis(connectTimeoutMs))
