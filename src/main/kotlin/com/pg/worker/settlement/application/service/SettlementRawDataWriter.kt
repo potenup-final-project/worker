@@ -4,7 +4,7 @@ import com.pg.worker.settlement.application.repository.SettlementRawDataReposito
 import com.pg.worker.settlement.application.usecase.command.dto.RecordSettlementCommand
 import com.pg.worker.settlement.domain.SettlementRawData
 import com.pg.worker.settlement.domain.TransactionType
-import org.slf4j.LoggerFactory
+import com.gop.logging.contract.StructuredLogger
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Propagation
@@ -12,9 +12,8 @@ import org.springframework.transaction.annotation.Transactional
 
 @Component
 class SettlementRawDataWriter(
-    private val rawDataRepository: SettlementRawDataRepository
-) {
-    private val log = LoggerFactory.getLogger(javaClass)
+    private val rawDataRepository: SettlementRawDataRepository,
+    private val log: StructuredLogger) {
 
     /**
      * 원본 이벤트 저장 (독립 트랜잭션)

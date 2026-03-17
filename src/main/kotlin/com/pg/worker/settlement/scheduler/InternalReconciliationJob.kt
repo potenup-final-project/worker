@@ -1,6 +1,7 @@
 package com.pg.worker.settlement.scheduler
 
 import com.pg.worker.settlement.application.service.InternalReconciliationService
+import com.pg.worker.global.logging.context.TraceScope
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import java.time.LocalDate
@@ -14,12 +15,11 @@ class InternalReconciliationJob(
      */
     @Scheduled(cron = "0 0 3 * * *", scheduler = "settlementWorkerScheduler")
     fun runDailyInternalReconciliation() {
-        val yesterday = LocalDate.now().minusDays(1)
-
-        // 전날 성공 거래 대사 (신규 누락 발견)
-        reconciliationService.detectMismatches(yesterday)
-
-        // 과거 OPEN 결과 재검사 (지연된 원장 자동 해결)
-        reconciliationService.resolveOpenMismatches()
+        val runTraceId = TraceScope.newRunTraceId("worker-internal-recon")
+        TraceScope.withTraceContext(traceId = runTraceId, messageId = "internal-reconciliation-job") {
+            val yesterday = LocalDate.now().minusDays(1)
+            reconciliationService.detectMismatches(yesterday)
+            reconciliationService.resolveOpenMismatches()
+        }
     }
 }

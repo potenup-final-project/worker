@@ -5,7 +5,7 @@ import com.pg.worker.settlement.domain.ExternalSettlementDetail
 import com.pg.worker.settlement.domain.ReconciliationStatus
 import com.pg.worker.settlement.domain.SettlementReconciliationResult
 import com.pg.worker.settlement.domain.SettlementReconciliationResultType
-import org.slf4j.LoggerFactory
+import com.gop.logging.contract.StructuredLogger
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Component
 import java.time.LocalDate
@@ -13,8 +13,7 @@ import java.time.LocalDate
 @Component
 class SettlementReconciliationWriter(
     private val repository: SettlementReconciliationResultRepository,
-) {
-    private val log = LoggerFactory.getLogger(javaClass)
+    private val log: StructuredLogger) {
 
     /**
      * MATCHED 결과 저장.

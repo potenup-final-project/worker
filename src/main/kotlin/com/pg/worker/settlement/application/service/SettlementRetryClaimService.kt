@@ -3,16 +3,15 @@ package com.pg.worker.settlement.application.service
 import com.pg.worker.settlement.application.repository.SettlementRawDataRepository
 import com.pg.worker.settlement.domain.RawDataStatus
 import com.pg.worker.settlement.domain.SettlementRetryPolicy
-import org.slf4j.LoggerFactory
+import com.gop.logging.contract.StructuredLogger
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDateTime
 
 @Service
 class SettlementRetryClaimService(
-    private val rawRepository: SettlementRawDataRepository
-) {
-    private val log = LoggerFactory.getLogger(javaClass)
+    private val rawRepository: SettlementRawDataRepository,
+    private val log: StructuredLogger) {
 
     /**
      * 재처리 대상 선점 (Short Transaction)

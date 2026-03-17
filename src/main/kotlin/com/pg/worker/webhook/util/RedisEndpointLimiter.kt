@@ -1,7 +1,7 @@
 package com.pg.worker.webhook.util
 
 import com.pg.worker.webhook.application.EndpointConcurrencyLimiter
-import org.slf4j.LoggerFactory
+import com.gop.logging.contract.StructuredLogger
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.data.redis.core.StringRedisTemplate
@@ -15,8 +15,7 @@ class RedisEndpointLimiter(
     @Value("\${webhook.limiter.redis.max-permits}") private val maxPermits: Int,
     @Value("\${webhook.limiter.redis.permit-ttl-ms}") private val permitTtlMs: Long,
     @Value("\${webhook.limiter.redis.fail-open}") private val failOpen: Boolean,
-) : EndpointConcurrencyLimiter {
-    private val log = LoggerFactory.getLogger(javaClass)
+    private val log: StructuredLogger) : EndpointConcurrencyLimiter {
 
     override fun tryAcquire(endpointId: Long): Boolean {
         return try {

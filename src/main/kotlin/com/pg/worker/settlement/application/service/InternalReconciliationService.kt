@@ -5,7 +5,7 @@ import com.pg.worker.settlement.application.repository.PaymentTransactionReposit
 import com.pg.worker.settlement.application.repository.SettlementLedgerRepository
 import com.pg.worker.settlement.application.repository.SettlementRawDataRepository
 import com.pg.worker.settlement.domain.*
-import org.slf4j.LoggerFactory
+import com.gop.logging.contract.StructuredLogger
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
@@ -16,9 +16,8 @@ class InternalReconciliationService(
     private val ledgerRepository: SettlementLedgerRepository,
     private val rawDataRepository: SettlementRawDataRepository,
     private val reconciliationResultRepository: InternalReconciliationResultRepository,
-    private val reconciliationWriter: InternalReconciliationWriter
-) {
-    private val log = LoggerFactory.getLogger(javaClass)
+    private val reconciliationWriter: InternalReconciliationWriter,
+    private val log: StructuredLogger) {
 
     private data class ReconciliationStats(
         var missingRawData: Int = 0,
